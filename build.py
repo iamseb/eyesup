@@ -121,13 +121,28 @@ def main():
         usable = (alt > horizon[np.round(az).astype(int) % 360]) & (alt > min_alt)
         hours[:, doy] = usable.sum(axis=1) * step / 60.0
 
+    # Reference sun altitudes for the browser to self-check its ported astronomy.
+    checks = []
+    for cdt in (datetime(YEAR,3,20,12,tzinfo=ZoneInfo("UTC")),
+                datetime(YEAR,6,21,22,tzinfo=ZoneInfo("UTC")),
+                datetime(YEAR,12,21,12,tzinfo=ZoneInfo("UTC"))):
+        jd = jd_of(cdt); ra, dec = sun_radec(jd)
+        alt, _ = altaz(ra, dec, np.array([gmst_deg(jd) + lon]), lat)
+        checks.append({"ms": int(cdt.timestamp()*1000), "sunAlt": round(float(alt[0]), 3)})
+
     data = {
         "site": {"name": site, "lat": lat, "lon": lon},
         "minAlt": min_alt,
+        "darkDep": dark_dep,
+        "fov": {"w": float(cfg.get("fov_width_deg", 2.0)),
+                "h": float(cfg.get("fov_height_deg", 1.33))},
+        "horizon": [round(float(h), 1) for h in horizon],
         "darkHours": [int(round(h * 10)) for h in darkhours],
+        "check": checks,
         "targets": [
             {"id": t[0], "name": t[1], "type": t[4], "sub": t[5],
-             "dec": round(t[3], 1), "transit": round(90 - abs(lat - t[3])),
+             "ra": round(t[2], 4), "dec": round(t[3], 4),
+             "transit": round(90 - abs(lat - t[3])),
              "hours": [int(round(h * 10)) for h in hours[i]]}
             for i, t in enumerate(targets)
         ],

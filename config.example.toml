@@ -15,3 +15,9 @@ min_altitude = 30.0
 
 # Time resolution of the calculation, minutes (smaller = slower, more precise).
 step_minutes = 15
+
+# Field of view (degrees) for the framing previews. Roughly:
+#   width  = 57.3 * sensor_width_mm  / focal_length_mm
+#   height = 57.3 * sensor_height_mm / focal_length_mm
+fov_width_deg = 2.0
+fov_height_deg = 1.33

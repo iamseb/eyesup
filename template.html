@@ -11,7 +11,7 @@
     font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
   header{position:sticky;top:0;z-index:5;background:rgba(11,15,22,.96);backdrop-filter:blur(6px);
     border-bottom:1px solid var(--line);padding:12px 16px}
-  .wrap{max-width:1000px;margin:0 auto;padding:16px}
+  .wrap{max-width:1040px;margin:0 auto;padding:16px}
   h1{margin:0;font-size:20px;letter-spacing:.5px}
   h1 small{color:var(--muted);font-weight:400;font-size:12px;letter-spacing:0}
   .datebar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
@@ -21,25 +21,28 @@
   .today{font-size:18px;font-weight:600;min-width:190px}
   .facts{margin-left:auto;color:var(--muted);font-size:13px;text-align:right}
   .facts b{color:var(--ink)}
-  .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-  @media(max-width:720px){.cols{grid-template-columns:1fr}}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .badge{font-size:11px;padding:2px 7px;border-radius:20px;border:1px solid var(--line);color:var(--muted)}
+  .badge.ok{color:var(--nb)} .badge.bad{color:var(--warn)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:16px}
   .card h2{margin:0;padding:12px 14px;font-size:15px;border-bottom:1px solid var(--line);
     display:flex;align-items:center;gap:8px}
   .dot{width:10px;height:10px;border-radius:50%}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:720px){.cols{grid-template-columns:1fr}}
   .rows{padding:6px 8px;max-height:52vh;overflow:auto}
   .row{display:flex;align-items:center;gap:10px;padding:8px 6px;border-top:1px solid var(--line)}
   .row:first-child{border-top:none}
+  .thumb{width:64px;height:43px;object-fit:cover;border-radius:5px;background:#05070b;flex:none;border:1px solid var(--line)}
   .nm{flex:1;min-width:0}
   .nm b{font-weight:600}
   .nm span{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .nm a{color:var(--accent);font-size:11px;text-decoration:none}
   .metric{text-align:right;font-variant-numeric:tabular-nums;font-size:13px;white-space:nowrap}
-  .bar{height:6px;border-radius:4px;background:var(--panel2);margin-top:4px;overflow:hidden}
-  .bar>i{display:block;height:100%}
   .empty{color:var(--muted);padding:18px;text-align:center;font-size:13px}
   .moonwarn{color:var(--warn);font-size:11px}
-  .hm{margin-top:18px}
-  .hmhead{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  #tl{padding:8px 6px 12px}
+  #tl svg{width:100%;height:auto;display:block}
+  .hmhead{display:flex;align-items:center;gap:10px;margin:16px 0 8px}
   .seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
   .seg button{border:none;border-radius:0;background:var(--panel)}
   .seg button.on{background:var(--accent);color:#04122b}
@@ -47,8 +50,8 @@
   table{border-collapse:collapse;font-size:11px}
   .grid td,.grid th{padding:0}
   .lbl{position:sticky;left:0;background:var(--panel);padding:2px 8px!important;white-space:nowrap;
-    border-right:1px solid var(--line);font-size:11px;z-index:1}
-  .mon{color:var(--muted);text-align:center;font-weight:400;height:18px}
+    border-right:1px solid var(--line);z-index:1}
+  .mon{color:var(--muted);text-align:center;height:18px}
   .cell{width:15px;height:15px}
   .nowcol{outline:2px solid var(--accent);outline-offset:-2px}
   .legend{color:var(--muted);font-size:11px;margin-top:6px}
@@ -64,131 +67,223 @@
     <button id="next">▶</button>
     <button id="todaybtn">Today</button>
     <input type="date" id="dpick">
+    <button id="wxbtn">☁ Load weather</button>
     <span class="facts" id="facts"></span>
+    <span class="badge" id="chk" title="Self-check of the in-browser astronomy vs precomputed values"></span>
   </div>
 </div></header>
 
 <div class="wrap">
+  <div class="card"><h2>Tonight's timeline <span id="tlsub" style="color:var(--muted);font-weight:400;font-size:12px"></span></h2>
+    <div id="tl"></div></div>
+
   <div class="cols">
-    <div class="card"><h2><span class="dot" style="background:var(--nb)"></span>Narrowband tonight
+    <div class="card"><h2><span class="dot" style="background:var(--nb)"></span>Narrowband
       <span style="color:var(--muted);font-weight:400;font-size:12px">· moonlight OK</span></h2>
       <div class="rows" id="nb"></div></div>
-    <div class="card"><h2><span class="dot" style="background:var(--rgb)"></span>RGB / broadband tonight
+    <div class="card"><h2><span class="dot" style="background:var(--rgb)"></span>RGB / broadband
       <span id="moontag" style="color:var(--muted);font-weight:400;font-size:12px"></span></h2>
       <div class="rows" id="rgb"></div></div>
   </div>
 
-  <div class="hm">
-    <div class="hmhead">
-      <b>Year view</b>
-      <span class="seg" id="seg">
-        <button data-t="NB" class="on">Narrowband</button>
-        <button data-t="RGB">RGB</button>
-      </span>
-      <span class="legend">usable dark hours — darker = more. The outlined column is this week.</span>
-    </div>
-    <div class="grid" id="hm"></div>
+  <div class="hmhead">
+    <b>Year view</b>
+    <span class="seg" id="seg"><button data-t="NB" class="on">Narrowband</button><button data-t="RGB">RGB</button></span>
+    <span class="legend">usable dark hours — darker = more. Outlined column is this week.</span>
   </div>
-  <p class="legend">Built from your measured local horizon. “Usable” = above the local
-  obstructions and above <span id="minalt"></span>° altitude, during nautical darkness. RGB advice folds in
-  the Moon; narrowband ignores it. Times are local.</p>
+  <div class="grid" id="hm"></div>
+
+  <p class="legend">Built from your measured local horizon. “Usable” = above your obstructions and above
+  <span id="minalt"></span>° altitude, during darkness. Previews are DSS2 survey cutouts framed to your
+  field of view (a framing check); “examples” links to real narrowband/RGB shots on AstroBin. Weather is
+  live from Open-Meteo. Times are your local time.</p>
 </div>
 
 <script>
 const DATA = __EYESUP_DATA__;
-document.getElementById("site").textContent =
-  "· "+DATA.site.name+" ("+DATA.site.lat.toFixed(2)+"°N)";
+const S = DATA.site, FOV = DATA.fov;
+let WX = null;   // loaded weather, keyed by ISO hour "YYYY-MM-DDTHH"
+document.getElementById("site").textContent = "· "+S.name+" ("+S.lat.toFixed(2)+"°N)";
 document.getElementById("minalt").textContent = DATA.minAlt;
 
-function doy(d){const s=new Date(d.getFullYear(),0,1);
-  return Math.min(Math.floor((d-s)/86400000)+1,365);}
-function moon(d){
-  const jd=d.getTime()/86400000+2440587.5, syn=29.530588853;
-  let age=(((jd-2451550.1)%syn)+syn)%syn, f=age/syn;
-  const illum=Math.round((1-Math.cos(2*Math.PI*f))/2*100);
-  const names=[[1.85,"new"],[5.54,"waxing crescent"],[9.23,"first quarter"],
-    [12.9,"waxing gibbous"],[16.6,"full"],[20.3,"waning gibbous"],[24.0,"last quarter"],
-    [27.7,"waning crescent"]];
-  let nm="new"; for(const [t,n] of names){if(age<t){nm=n;break;}}
-  return {illum,nm};
+// ---------- astronomy (mirrors build.py, validated) ----------
+const rad=d=>d*Math.PI/180, deg=r=>r*180/Math.PI, mod=(x,m)=>((x%m)+m)%m;
+const jd=date=>date.getTime()/86400000+2440587.5;
+function gmst(j){const d=j-2451545,T=d/36525;
+  return mod(280.46061837+360.98564736629*d+0.000387933*T*T-T*T*T/38710000,360);}
+function sunRaDec(j){const T=(j-2451545)/36525,
+  L=rad(mod(280.460+36000.771*T,360)),g=rad(mod(357.528+35999.050*T,360)),
+  lam=L+rad(1.915)*Math.sin(g)+rad(0.020)*Math.sin(2*g),eps=rad(23.439-0.013*T);
+  return {ra:mod(deg(Math.atan2(Math.cos(eps)*Math.sin(lam),Math.cos(lam))),360),
+          dec:deg(Math.asin(Math.sin(eps)*Math.sin(lam)))};}
+function altaz(ra,dec,lst,lat){const H=rad(lst-ra),d=rad(dec),L=rad(lat);
+  const alt=deg(Math.asin(Math.cos(H)*Math.cos(d)*Math.cos(L)+Math.sin(d)*Math.sin(L)));
+  const e=-Math.sin(H)*Math.cos(d),n=Math.sin(d)*Math.cos(L)-Math.cos(H)*Math.cos(d)*Math.sin(L);
+  return {alt,az:mod(deg(Math.atan2(e,n)),360)};}
+const lstAt=date=>mod(gmst(jd(date))+S.lon,360);
+const sunAlt=date=>{const s=sunRaDec(jd(date));return altaz(s.ra,s.dec,lstAt(date),S.lat).alt;};
+const targetAA=(t,date)=>altaz(t.ra,t.dec,lstAt(date),S.lat);
+const horizonAt=az=>DATA.horizon[Math.round(mod(az,360))%360];
+
+function selfCheck(){
+  let worst=0; DATA.check.forEach(c=>worst=Math.max(worst,Math.abs(sunAlt(new Date(c.ms))-c.sunAlt)));
+  const el=document.getElementById("chk");
+  if(worst<0.5){el.textContent="astro ✓";el.className="badge ok";}
+  else{el.textContent="astro ⚠ "+worst.toFixed(1)+"°";el.className="badge bad";}
 }
+
+// dark window (the night following local noon of `base`)
+function darkWindow(base){
+  const start=new Date(base); start.setHours(12,0,0,0);
+  let firstD=null,lastD=null;
+  for(let i=0;i<=288;i++){
+    const t=new Date(start.getTime()+i*5*60000);
+    if(sunAlt(t) < -DATA.darkDep){ if(firstD===null)firstD=t; lastD=t; }
+  }
+  if(firstD===null) return null;
+  return {start:firstD, end:new Date(lastD.getTime()+5*60000)};
+}
+
+// ---------- misc ----------
+function doy(d){const s=new Date(d.getFullYear(),0,1);return Math.min(Math.floor((d-s)/86400000)+1,365);}
+function moon(d){const j=jd(d),syn=29.530588853;let age=mod(j-2451550.1,syn),f=age/syn;
+  const illum=Math.round((1-Math.cos(2*Math.PI*f))/2*100);
+  const nm=[[1.85,"new"],[5.54,"waxing crescent"],[9.23,"first quarter"],[12.9,"waxing gibbous"],
+    [16.6,"full"],[20.3,"waning gibbous"],[24,"last quarter"],[27.7,"waning crescent"]];
+  let name="new";for(const[t,n]of nm){if(age<t){name=n;break;}}return{illum,nm:name};}
 const fmt=new Intl.DateTimeFormat("en-GB",{weekday:"long",day:"numeric",month:"long"});
+const hhmm=d=>d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
+function cutout(t){return "https://alasky.u-strasbg.fr/hips-image-services/hips2fits?hips="+
+  "CDS%2FP%2FDSS2%2Fcolor&ra="+t.ra+"&dec="+t.dec+"&fov="+FOV.w+"&width=128&height="+
+  Math.round(128*FOV.h/FOV.w)+"&projection=TAN&format=jpg";}
+function astrobin(t){const q=(t.name!==t.id?t.name+" ":"")+t.id.replace(/([A-Za-z]+)(\d+)/,"$1 $2");
+  return "https://www.astrobin.com/search/?q="+encodeURIComponent(q.trim());}
+function altColor(a){const f=Math.max(0,Math.min(1,a/80));
+  return "rgb("+Math.round(40+f*30)+","+Math.round(60+f*150)+","+Math.round(70+f*60)+")";}
 
 let cur=new Date(); cur.setHours(12,0,0,0);
 
-function targetsFor(day){
-  return DATA.targets.map(t=>({t,h:t.hours[day-1]/10})).filter(x=>x.h>0);
-}
+// ---------- tonight lists ----------
 function render(){
   const day=doy(cur);
   document.getElementById("dlabel").textContent=fmt.format(cur);
   document.getElementById("dpick").value=cur.toISOString().slice(0,10);
   const dark=DATA.darkHours[day-1]/10, mn=moon(cur);
   document.getElementById("facts").innerHTML=
-    `Dark: <b>${dark.toFixed(1)} h</b> &nbsp;·&nbsp; Moon: <b>${mn.illum}%</b> ${mn.nm}`;
+    "Dark: <b>"+dark.toFixed(1)+" h</b> · Moon: <b>"+mn.illum+"%</b> "+mn.nm;
   const moonBright=mn.illum>=50;
   document.getElementById("moontag").innerHTML= moonBright
-    ? `· <span class="moonwarn">Moon ${mn.illum}% — favour narrowband</span>` : "· Moon-friendly";
+    ? '· <span class="moonwarn">Moon '+mn.illum+'% — favour narrowband</span>' : "· Moon-friendly";
 
-  const items=targetsFor(day).sort((a,b)=>b.h-a.h);
-  const mkrow=(x,moonWarn)=>{
+  const items=DATA.targets.map(t=>({t,h:t.hours[day-1]/10})).filter(x=>x.h>0).sort((a,b)=>b.h-a.h);
+  const mkrow=(x,warn)=>{
     const col=x.t.type==="NB"?"var(--nb)":"var(--rgb)";
     const w=Math.max(3,Math.min(100,x.h/Math.max(dark,0.1)*100));
-    return `<div class="row"><div class="nm"><b>${x.t.name}</b>
-      <span>${x.t.id} · ${x.t.sub}${moonWarn?' · <span class="moonwarn">☾ washed by moon</span>':''}</span>
-      <div class="bar"><i style="width:${w}%;background:${col}"></i></div></div>
-      <div class="metric">${x.h.toFixed(1)} h<br><span style="color:var(--muted)">max ${x.t.transit}°</span></div></div>`;
+    return '<div class="row"><img class="thumb" loading="lazy" src="'+cutout(x.t)+'" alt="">'+
+      '<div class="nm"><b>'+x.t.name+'</b><span>'+x.t.id+' · '+x.t.sub+
+      (warn?' · <span class="moonwarn">☾ moon</span>':'')+
+      ' · <a href="'+astrobin(x.t)+'" target="_blank" rel="noopener">examples ↗</a></span>'+
+      '<div style="height:6px;border-radius:4px;background:var(--panel2);margin-top:4px">'+
+      '<i style="display:block;height:100%;width:'+w+'%;background:'+col+';border-radius:4px"></i></div></div>'+
+      '<div class="metric">'+x.h.toFixed(1)+' h<br><span style="color:var(--muted)">max '+x.t.transit+'°</span></div></div>';
   };
-  const nb=items.filter(x=>x.t.type==="NB");
-  const rgb=items.filter(x=>x.t.type==="RGB");
-  document.getElementById("nb").innerHTML= nb.length? nb.map(x=>mkrow(x,false)).join("")
-    : `<div class="empty">Nothing above ${DATA.minAlt}° in the dark tonight.</div>`;
-  document.getElementById("rgb").innerHTML= rgb.length? rgb.map(x=>mkrow(x,moonBright)).join("")
-    : `<div class="empty">Nothing above ${DATA.minAlt}° in the dark tonight.</div>`;
+  const nb=items.filter(x=>x.t.type==="NB"), rgb=items.filter(x=>x.t.type==="RGB");
+  document.getElementById("nb").innerHTML= nb.length?nb.map(x=>mkrow(x,false)).join(""):'<div class="empty">Nothing usable in the dark tonight.</div>';
+  document.getElementById("rgb").innerHTML= rgb.length?rgb.map(x=>mkrow(x,moonBright)).join(""):'<div class="empty">Nothing usable in the dark tonight.</div>';
+  renderTimeline();
   drawHeatmap();
 }
 
-let hmType="NB";
-function colorFor(h,maxh){
-  if(h<=0) return "#0e131b";
-  const f=Math.min(1,h/maxh);
-  const g=Math.round(40+f*150), r=Math.round(20+f*30), b=Math.round(30+f*40);
-  return `rgb(${r},${g},${b})`;
+// ---------- timeline ----------
+function usableRuns(t,win){
+  const runs=[]; let s=null,peak=0;
+  for(let ms=win.start.getTime();ms<=win.end.getTime();ms+=5*60000){
+    const d=new Date(ms),aa=targetAA(t,d),ok=aa.alt>DATA.minAlt&&aa.alt>horizonAt(aa.az);
+    if(ok){ if(s===null)s=ms; peak=Math.max(peak,aa.alt);} else if(s!==null){runs.push([s,ms,peak]);s=null;peak=0;}
+  }
+  if(s!==null)runs.push([s,win.end.getTime(),peak]);
+  return runs;
 }
-function drawHeatmap(){
-  const rows=DATA.targets.filter(t=>t.type===hmType && Math.max(...t.hours)>0)
-    .sort((a,b)=>b.hours.indexOf(Math.max(...b.hours))-a.hours.indexOf(Math.max(...a.hours)));
-  const maxh=Math.max(...rows.flatMap(t=>t.hours))/10||1;
-  const wk=d=>Math.floor((d)/7);
-  const nowWeek=wk(doy(cur)-1);
-  const monPos=[0,4.4,8.4,13,17.3,21.7,26,30.4,34.9,39,43.4,47.7]; // approx week of month start
-  let head='<tr><th class="lbl"></th>';
-  for(let w=0;w<52;w++){
-    let m=monPos.findIndex((p,i)=>Math.round(p)===w);
-    head+=`<th class="mon">${m>=0?["J","F","M","A","M","J","J","A","S","O","N","D"][m]:""}</th>`;
+function renderTimeline(){
+  const win=darkWindow(cur), host=document.getElementById("tl"), sub=document.getElementById("tlsub");
+  if(!win){host.innerHTML='<div class="empty">No darkness this night (Sun never '+DATA.darkDep+'° below the horizon).</div>';sub.textContent="";return;}
+  sub.textContent="dark "+hhmm(win.start)+"–"+hhmm(win.end);
+  const day=doy(cur);
+  const list=DATA.targets.filter(t=>t.hours[day-1]>0)
+    .map(t=>({t,runs:usableRuns(t,win)})).filter(x=>x.runs.length)
+    .sort((a,b)=>a.runs[0][0]-b.runs[0][0]).slice(0,18);
+  const W=1000,PADL=118,PADR=14,rowH=20,top=34,H=top+list.length*rowH+8;
+  const span=win.end-win.start, X=ms=>PADL+(ms-win.start)/span*(W-PADL-PADR);
+  let svg='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMinYMin meet">';
+  let h0=new Date(win.start); h0.setMinutes(0,0,0); h0=new Date(h0.getTime()+3600000);
+  for(let t=h0.getTime();t<win.end.getTime();t+=3600000){
+    svg+='<line x1="'+X(t)+'" y1="'+(top-6)+'" x2="'+X(t)+'" y2="'+(H-4)+'" stroke="#22303f" stroke-width="1"/>'+
+         '<text x="'+X(t)+'" y="'+(top-10)+'" fill="#93a1b0" font-size="10" text-anchor="middle">'+hhmm(new Date(t))+'</text>';
   }
-  head+='</tr>';
-  let body='';
-  for(const t of rows){
-    body+=`<tr><td class="lbl">${t.name}</td>`;
-    for(let w=0;w<52;w++){
-      let seg=t.hours.slice(w*7,w*7+7); let avg=seg.reduce((a,b)=>a+b,0)/seg.length/10;
-      body+=`<td class="cell ${w===nowWeek?'nowcol':''}" title="${t.name}: ${avg.toFixed(1)}h"
-        style="background:${colorFor(avg,maxh)}"></td>`;
+  if(WX){
+    for(let t=win.start.getTime();t<win.end.getTime();t+=3600000){
+      const key=new Date(t).toISOString().slice(0,13),c=WX[key];
+      if(c==null)continue; const block=Math.max(c.low,c.mid),g=Math.round(60-block/100*40);
+      svg+='<rect x="'+X(t)+'" y="4" width="'+(X(t+3600000)-X(t))+'" height="12" fill="rgb('+(g+40)+','+(g+40)+','+(g+46)+')"><title>'+hhmm(new Date(t))+' cloud low '+c.low+'% mid '+c.mid+'% high '+c.high+'%</title></rect>';
     }
-    body+='</tr>';
+    svg+='<text x="4" y="14" fill="#93a1b0" font-size="10">cloud</text>';
   }
-  document.getElementById("hm").innerHTML=`<table>${head}${body}</table>`;
+  const nowd=new Date();
+  if(nowd>=win.start&&nowd<=win.end)svg+='<line x1="'+X(nowd)+'" y1="'+(top-6)+'" x2="'+X(nowd)+'" y2="'+(H-4)+'" stroke="#8ab4ff" stroke-width="1.5"/>';
+  list.forEach((x,i)=>{
+    const y=top+i*rowH, col=x.t.type==="NB"?"#5ad17a":"#5aa9ff";
+    svg+='<circle cx="6" cy="'+(y+8)+'" r="4" fill="'+col+'"/>'+
+         '<text x="16" y="'+(y+11)+'" fill="#e6edf3" font-size="11">'+x.t.name+'</text>';
+    x.runs.forEach(r=>{
+      svg+='<rect x="'+X(r[0])+'" y="'+(y+2)+'" width="'+Math.max(2,X(r[1])-X(r[0]))+'" height="12" rx="3" fill="'+altColor(r[2])+'"><title>'+x.t.name+': '+hhmm(new Date(r[0]))+'–'+hhmm(new Date(r[1]))+', peak '+Math.round(r[2])+'°</title></rect>';
+    });
+  });
+  svg+='</svg>';
+  host.innerHTML= list.length?svg:'<div class="empty">Nothing clears your horizon during darkness tonight.</div>';
+}
+
+async function loadWeather(){
+  const win=darkWindow(cur); if(!win){alert("No dark window tonight.");return;}
+  const b=document.getElementById("wxbtn"); b.textContent="☁ …";
+  const d0=win.start.toISOString().slice(0,10), d1=win.end.toISOString().slice(0,10);
+  try{
+    const u="https://api.open-meteo.com/v1/forecast?latitude="+S.lat+"&longitude="+S.lon+
+      "&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high&timezone=auto&start_date="+d0+"&end_date="+d1;
+    const r=await fetch(u); const j=await r.json(); WX={};
+    j.hourly.time.forEach((tt,k)=>{WX[tt.slice(0,13)]={low:j.hourly.cloud_cover_low[k],
+      mid:j.hourly.cloud_cover_mid[k],high:j.hourly.cloud_cover_high[k]};});
+    b.textContent="☁ Weather ✓"; renderTimeline();
+  }catch(e){ b.textContent="☁ Weather (offline)"; }
+}
+
+// ---------- year heatmap ----------
+let hmType="NB";
+function colorFor(h,mx){if(h<=0)return"#0e131b";const f=Math.min(1,h/mx);
+  return "rgb("+Math.round(20+f*30)+","+Math.round(40+f*150)+","+Math.round(30+f*40)+")";}
+function drawHeatmap(){
+  const rows=DATA.targets.filter(t=>t.type===hmType&&Math.max(...t.hours)>0)
+    .sort((a,b)=>b.hours.indexOf(Math.max(...b.hours))-a.hours.indexOf(Math.max(...a.hours)));
+  const mx=Math.max(...rows.flatMap(t=>t.hours))/10||1, nowWeek=Math.floor((doy(cur)-1)/7);
+  const monPos=[0,4.4,8.4,13,17.3,21.7,26,30.4,34.9,39,43.4,47.7], ML="JFMAMJJASOND";
+  let head='<tr><th class="lbl"></th>';
+  for(let w=0;w<52;w++){let m=monPos.findIndex(p=>Math.round(p)===w);head+='<th class="mon">'+(m>=0?ML[m]:"")+'</th>';}
+  head+='</tr>'; let body='';
+  for(const t of rows){body+='<tr><td class="lbl">'+t.name+'</td>';
+    for(let w=0;w<52;w++){const seg=t.hours.slice(w*7,w*7+7),avg=seg.reduce((a,b)=>a+b,0)/seg.length/10;
+      body+='<td class="cell '+(w===nowWeek?'nowcol':'')+'" title="'+t.name+': '+avg.toFixed(1)+'h" style="background:'+colorFor(avg,mx)+'"></td>';}
+    body+='</tr>';}
+  document.getElementById("hm").innerHTML='<table>'+head+body+'</table>';
 }
 
 document.getElementById("prev").onclick=()=>{cur.setDate(cur.getDate()-1);render();};
 document.getElementById("next").onclick=()=>{cur.setDate(cur.getDate()+1);render();};
 document.getElementById("todaybtn").onclick=()=>{cur=new Date();cur.setHours(12,0,0,0);render();};
 document.getElementById("dpick").onchange=e=>{cur=new Date(e.target.value+"T12:00");render();};
+document.getElementById("wxbtn").onclick=loadWeather;
 document.querySelectorAll("#seg button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("#seg button").forEach(x=>x.classList.remove("on"));
-  b.classList.add("on"); hmType=b.dataset.t; drawHeatmap();});
-render();
+  b.classList.add("on");hmType=b.dataset.t;drawHeatmap();});
+selfCheck(); render();
 </script>
 </body>
 </html>
