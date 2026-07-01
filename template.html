@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EyesUp — observing planner</title>
+<style>
+  :root{--bg:#0b0f16;--panel:#151b26;--panel2:#1d2634;--ink:#e6edf3;--muted:#93a1b0;
+    --line:#28323f;--nb:#5ad17a;--rgb:#5aa9ff;--warn:#e0b23b;--accent:#8ab4ff}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  header{position:sticky;top:0;z-index:5;background:rgba(11,15,22,.96);backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--line);padding:12px 16px}
+  .wrap{max-width:1000px;margin:0 auto;padding:16px}
+  h1{margin:0;font-size:20px;letter-spacing:.5px}
+  h1 small{color:var(--muted);font-weight:400;font-size:12px;letter-spacing:0}
+  .datebar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
+  button,input[type=date]{background:var(--panel2);color:var(--ink);border:1px solid var(--line);
+    border-radius:8px;padding:6px 10px;font:inherit;cursor:pointer}
+  button:hover{border-color:var(--accent)}
+  .today{font-size:18px;font-weight:600;min-width:190px}
+  .facts{margin-left:auto;color:var(--muted);font-size:13px;text-align:right}
+  .facts b{color:var(--ink)}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:720px){.cols{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .card h2{margin:0;padding:12px 14px;font-size:15px;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:8px}
+  .dot{width:10px;height:10px;border-radius:50%}
+  .rows{padding:6px 8px;max-height:52vh;overflow:auto}
+  .row{display:flex;align-items:center;gap:10px;padding:8px 6px;border-top:1px solid var(--line)}
+  .row:first-child{border-top:none}
+  .nm{flex:1;min-width:0}
+  .nm b{font-weight:600}
+  .nm span{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .metric{text-align:right;font-variant-numeric:tabular-nums;font-size:13px;white-space:nowrap}
+  .bar{height:6px;border-radius:4px;background:var(--panel2);margin-top:4px;overflow:hidden}
+  .bar>i{display:block;height:100%}
+  .empty{color:var(--muted);padding:18px;text-align:center;font-size:13px}
+  .moonwarn{color:var(--warn);font-size:11px}
+  .hm{margin-top:18px}
+  .hmhead{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg button{border:none;border-radius:0;background:var(--panel)}
+  .seg button.on{background:var(--accent);color:#04122b}
+  .grid{overflow:auto;border:1px solid var(--line);border-radius:10px}
+  table{border-collapse:collapse;font-size:11px}
+  .grid td,.grid th{padding:0}
+  .lbl{position:sticky;left:0;background:var(--panel);padding:2px 8px!important;white-space:nowrap;
+    border-right:1px solid var(--line);font-size:11px;z-index:1}
+  .mon{color:var(--muted);text-align:center;font-weight:400;height:18px}
+  .cell{width:15px;height:15px}
+  .nowcol{outline:2px solid var(--accent);outline-offset:-2px}
+  .legend{color:var(--muted);font-size:11px;margin-top:6px}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<header><div class="wrap" style="padding:0">
+  <h1>🔭 EyesUp <small id="site"></small></h1>
+  <div class="datebar">
+    <button id="prev">◀</button>
+    <span class="today" id="dlabel"></span>
+    <button id="next">▶</button>
+    <button id="todaybtn">Today</button>
+    <input type="date" id="dpick">
+    <span class="facts" id="facts"></span>
+  </div>
+</div></header>
+
+<div class="wrap">
+  <div class="cols">
+    <div class="card"><h2><span class="dot" style="background:var(--nb)"></span>Narrowband tonight
+      <span style="color:var(--muted);font-weight:400;font-size:12px">· moonlight OK</span></h2>
+      <div class="rows" id="nb"></div></div>
+    <div class="card"><h2><span class="dot" style="background:var(--rgb)"></span>RGB / broadband tonight
+      <span id="moontag" style="color:var(--muted);font-weight:400;font-size:12px"></span></h2>
+      <div class="rows" id="rgb"></div></div>
+  </div>
+
+  <div class="hm">
+    <div class="hmhead">
+      <b>Year view</b>
+      <span class="seg" id="seg">
+        <button data-t="NB" class="on">Narrowband</button>
+        <button data-t="RGB">RGB</button>
+      </span>
+      <span class="legend">usable dark hours — darker = more. The outlined column is this week.</span>
+    </div>
+    <div class="grid" id="hm"></div>
+  </div>
+  <p class="legend">Built from your measured local horizon. “Usable” = above the local
+  obstructions and above <span id="minalt"></span>° altitude, during nautical darkness. RGB advice folds in
+  the Moon; narrowband ignores it. Times are local.</p>
+</div>
+
+<script>
+const DATA = __EYESUP_DATA__;
+document.getElementById("site").textContent =
+  "· "+DATA.site.name+" ("+DATA.site.lat.toFixed(2)+"°N)";
+document.getElementById("minalt").textContent = DATA.minAlt;
+
+function doy(d){const s=new Date(d.getFullYear(),0,1);
+  return Math.min(Math.floor((d-s)/86400000)+1,365);}
+function moon(d){
+  const jd=d.getTime()/86400000+2440587.5, syn=29.530588853;
+  let age=(((jd-2451550.1)%syn)+syn)%syn, f=age/syn;
+  const illum=Math.round((1-Math.cos(2*Math.PI*f))/2*100);
+  const names=[[1.85,"new"],[5.54,"waxing crescent"],[9.23,"first quarter"],
+    [12.9,"waxing gibbous"],[16.6,"full"],[20.3,"waning gibbous"],[24.0,"last quarter"],
+    [27.7,"waning crescent"]];
+  let nm="new"; for(const [t,n] of names){if(age<t){nm=n;break;}}
+  return {illum,nm};
+}
+const fmt=new Intl.DateTimeFormat("en-GB",{weekday:"long",day:"numeric",month:"long"});
+
+let cur=new Date(); cur.setHours(12,0,0,0);
+
+function targetsFor(day){
+  return DATA.targets.map(t=>({t,h:t.hours[day-1]/10})).filter(x=>x.h>0);
+}
+function render(){
+  const day=doy(cur);
+  document.getElementById("dlabel").textContent=fmt.format(cur);
+  document.getElementById("dpick").value=cur.toISOString().slice(0,10);
+  const dark=DATA.darkHours[day-1]/10, mn=moon(cur);
+  document.getElementById("facts").innerHTML=
+    `Dark: <b>${dark.toFixed(1)} h</b> &nbsp;·&nbsp; Moon: <b>${mn.illum}%</b> ${mn.nm}`;
+  const moonBright=mn.illum>=50;
+  document.getElementById("moontag").innerHTML= moonBright
+    ? `· <span class="moonwarn">Moon ${mn.illum}% — favour narrowband</span>` : "· Moon-friendly";
+
+  const items=targetsFor(day).sort((a,b)=>b.h-a.h);
+  const mkrow=(x,moonWarn)=>{
+    const col=x.t.type==="NB"?"var(--nb)":"var(--rgb)";
+    const w=Math.max(3,Math.min(100,x.h/Math.max(dark,0.1)*100));
+    return `<div class="row"><div class="nm"><b>${x.t.name}</b>
+      <span>${x.t.id} · ${x.t.sub}${moonWarn?' · <span class="moonwarn">☾ washed by moon</span>':''}</span>
+      <div class="bar"><i style="width:${w}%;background:${col}"></i></div></div>
+      <div class="metric">${x.h.toFixed(1)} h<br><span style="color:var(--muted)">max ${x.t.transit}°</span></div></div>`;
+  };
+  const nb=items.filter(x=>x.t.type==="NB");
+  const rgb=items.filter(x=>x.t.type==="RGB");
+  document.getElementById("nb").innerHTML= nb.length? nb.map(x=>mkrow(x,false)).join("")
+    : `<div class="empty">Nothing above ${DATA.minAlt}° in the dark tonight.</div>`;
+  document.getElementById("rgb").innerHTML= rgb.length? rgb.map(x=>mkrow(x,moonBright)).join("")
+    : `<div class="empty">Nothing above ${DATA.minAlt}° in the dark tonight.</div>`;
+  drawHeatmap();
+}
+
+let hmType="NB";
+function colorFor(h,maxh){
+  if(h<=0) return "#0e131b";
+  const f=Math.min(1,h/maxh);
+  const g=Math.round(40+f*150), r=Math.round(20+f*30), b=Math.round(30+f*40);
+  return `rgb(${r},${g},${b})`;
+}
+function drawHeatmap(){
+  const rows=DATA.targets.filter(t=>t.type===hmType && Math.max(...t.hours)>0)
+    .sort((a,b)=>b.hours.indexOf(Math.max(...b.hours))-a.hours.indexOf(Math.max(...a.hours)));
+  const maxh=Math.max(...rows.flatMap(t=>t.hours))/10||1;
+  const wk=d=>Math.floor((d)/7);
+  const nowWeek=wk(doy(cur)-1);
+  const monPos=[0,4.4,8.4,13,17.3,21.7,26,30.4,34.9,39,43.4,47.7]; // approx week of month start
+  let head='<tr><th class="lbl"></th>';
+  for(let w=0;w<52;w++){
+    let m=monPos.findIndex((p,i)=>Math.round(p)===w);
+    head+=`<th class="mon">${m>=0?["J","F","M","A","M","J","J","A","S","O","N","D"][m]:""}</th>`;
+  }
+  head+='</tr>';
+  let body='';
+  for(const t of rows){
+    body+=`<tr><td class="lbl">${t.name}</td>`;
+    for(let w=0;w<52;w++){
+      let seg=t.hours.slice(w*7,w*7+7); let avg=seg.reduce((a,b)=>a+b,0)/seg.length/10;
+      body+=`<td class="cell ${w===nowWeek?'nowcol':''}" title="${t.name}: ${avg.toFixed(1)}h"
+        style="background:${colorFor(avg,maxh)}"></td>`;
+    }
+    body+='</tr>';
+  }
+  document.getElementById("hm").innerHTML=`<table>${head}${body}</table>`;
+}
+
+document.getElementById("prev").onclick=()=>{cur.setDate(cur.getDate()-1);render();};
+document.getElementById("next").onclick=()=>{cur.setDate(cur.getDate()+1);render();};
+document.getElementById("todaybtn").onclick=()=>{cur=new Date();cur.setHours(12,0,0,0);render();};
+document.getElementById("dpick").onchange=e=>{cur=new Date(e.target.value+"T12:00");render();};
+document.querySelectorAll("#seg button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("#seg button").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on"); hmType=b.dataset.t; drawHeatmap();});
+render();
+</script>
+</body>
+</html>

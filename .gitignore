@@ -1,0 +1,10 @@
+# Your private inputs — never commit these
+config.toml
+horizon.csv
+
+# Generated output
+dist/
+
+__pycache__/
+*.pyc
+.venv/

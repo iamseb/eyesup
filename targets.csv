@@ -1,0 +1,137 @@
+id,name,ra,dec,type,sub
+M1,Crab,83.6324,22.0174,NB,supernova remnant
+M10,M10,254.2877,-4.1003,RGB,globular cluster
+M100,M100,185.7289,15.8223,RGB,galaxy
+M101,Pinwheel,210.8024,54.3488,RGB,galaxy
+M102,M102,226.6232,55.7633,RGB,galaxy
+M103,M103,23.3392,60.6589,RGB,open cluster
+M104,Sombrero,189.9976,-11.6231,RGB,galaxy
+M105,M105,161.9567,12.5816,RGB,galaxy
+M106,M106,184.7401,47.3037,RGB,galaxy
+M107,M107,248.1327,-13.0538,RGB,globular cluster
+M108,M108,167.879,55.6741,RGB,galaxy
+M109,M109,179.3998,53.3747,RGB,galaxy
+M11,Wild Duck,282.7658,-6.2719,RGB,open cluster
+M110,M110,10.0919,41.6854,RGB,galaxy
+M12,M12,251.8091,-1.9485,RGB,globular cluster
+M13,Hercules Cluster,250.4235,36.4613,RGB,globular cluster
+M14,M14,264.4006,-3.2459,RGB,globular cluster
+M15,M15,322.493,12.167,RGB,globular cluster
+M16,Eagle,274.688,-13.792,NB,open cluster
+M17,Omega,275.1958,-16.1717,NB,open cluster
+M18,M18,274.9875,-17.0883,RGB,open cluster
+M19,M19,255.657,-26.2679,RGB,globular cluster
+M2,M2,323.3626,-0.8232,RGB,globular cluster
+M20,Trifid,270.675,-22.9717,NB,open cluster
+M21,M21,271.0358,-22.505,RGB,open cluster
+M22,Sgr Cluster,279.0998,-23.9047,RGB,globular cluster
+M23,M23,269.2371,-18.9869,RGB,open cluster
+M24,M24,274.2,-18.55,RGB,association
+M25,M25,277.9371,-19.1139,RGB,open cluster
+M26,M26,281.3171,-9.3861,RGB,open cluster
+M27,Dumbbell,299.9015,22.7212,NB,planetary nebula
+M28,M28,276.137,-24.8698,RGB,globular cluster
+M29,M29,305.9417,38.4867,RGB,open cluster
+M3,M3,205.5484,28.3773,RGB,globular cluster
+M30,M30,325.0922,-23.1799,RGB,globular cluster
+M31,Andromeda,10.6847,41.2688,RGB,galaxy
+M32,M32,10.6743,40.8652,RGB,galaxy
+M33,Triangulum,23.4621,30.6602,RGB,galaxy
+M34,M34,40.5308,42.7219,RGB,open cluster
+M35,M35,92.2721,24.3361,RGB,open cluster
+M36,M36,84.0842,34.135,RGB,open cluster
+M37,M37,88.0742,32.545,RGB,open cluster
+M38,M38,82.1671,35.8239,RGB,open cluster
+M39,M39,322.8892,48.2469,RGB,open cluster
+M4,M4,245.8968,-26.5258,RGB,globular cluster
+M40,M40,185.55,58.0833,RGB,?
+M41,M41,101.4992,-20.7161,RGB,open cluster
+M42,Orion Nebula,83.8201,-5.3876,NB,emission nebula
+M43,de Mairan's,83.8792,-5.27,NB,emission nebula
+M44,Beehive,130.0542,19.6211,RGB,open cluster
+M45,Pleiades,56.6008,24.1139,RGB,open cluster
+M46,M46,115.445,-14.8439,RGB,open cluster
+M47,M47,114.1471,-14.4889,RGB,open cluster
+M48,M48,123.4121,-5.7261,RGB,open cluster
+M49,M49,187.4449,8.0004,RGB,galaxy
+M5,M5,229.6384,2.081,RGB,globular cluster
+M50,M50,105.6842,-8.365,RGB,open cluster
+M51,Whirlpool,202.4696,47.1953,RGB,galaxy
+M52,M52,351.195,61.59,RGB,open cluster
+M53,M53,198.2302,18.1682,RGB,globular cluster
+M54,M54,283.7639,-30.4799,RGB,globular cluster
+M55,M55,294.9988,-30.9647,RGB,globular cluster
+M56,M56,289.1482,30.1835,RGB,globular cluster
+M57,Ring,283.3962,33.0291,NB,planetary nebula
+M58,M58,189.4317,11.8181,RGB,galaxy
+M59,M59,190.5094,11.6469,RGB,galaxy
+M6,Butterfly,265.0692,-32.2419,RGB,open cluster
+M60,M60,190.9165,11.5527,RGB,galaxy
+M61,M61,185.4789,4.4738,RGB,galaxy
+M62,M62,255.3025,-30.1124,RGB,globular cluster
+M63,Sunflower,198.9553,42.0294,RGB,galaxy
+M64,Black Eye,194.1821,21.6827,RGB,galaxy
+M65,M65,169.733,13.0923,RGB,galaxy
+M66,M66,170.0626,12.9915,RGB,galaxy
+M67,M67,132.8458,11.8139,RGB,open cluster
+M68,M68,189.8666,-26.7441,RGB,globular cluster
+M69,M69,277.8462,-32.3481,RGB,globular cluster
+M7,Ptolemy,268.4471,-34.8411,RGB,open cluster
+M70,M70,280.8032,-32.2921,RGB,globular cluster
+M71,M71,298.4437,18.7792,RGB,globular cluster
+M72,M72,313.3654,-12.5373,RGB,globular cluster
+M73,M73,314.75,-12.6333,RGB,err
+M74,M74,24.1739,15.7836,RGB,galaxy
+M75,M75,301.5202,-21.9223,RGB,globular cluster
+M76,Little Dumbbell,25.5819,51.5754,NB,planetary nebula
+M77,M77,40.6696,-0.0133,RGB,galaxy
+M78,M78,86.6908,0.0792,RGB,reflection nebula
+M79,M79,81.0441,-24.5242,RGB,globular cluster
+M8,Lagoon,270.9042,-24.3867,NB,open cluster
+M80,M80,244.26,-22.9761,RGB,globular cluster
+M81,Bode's,148.8882,69.0653,RGB,galaxy
+M82,Cigar,148.9685,69.6797,RGB,galaxy
+M83,M83,204.2538,-29.8658,RGB,galaxy
+M84,M84,186.2656,12.887,RGB,galaxy
+M85,M85,186.3502,18.1911,RGB,galaxy
+M86,M86,186.5492,12.946,RGB,galaxy
+M87,M87,187.7059,12.3911,RGB,galaxy
+M88,M88,187.9965,14.4203,RGB,galaxy
+M89,M89,188.9159,12.5563,RGB,galaxy
+M9,M9,259.7991,-18.5162,RGB,globular cluster
+M90,M90,189.2075,13.1629,RGB,galaxy
+M91,M91,188.8602,14.4963,RGB,galaxy
+M92,M92,259.2808,43.1359,RGB,globular cluster
+M93,M93,116.1408,-23.8531,RGB,open cluster
+M94,M94,192.7211,41.1203,RGB,galaxy
+M95,M95,160.9905,11.7037,RGB,galaxy
+M96,M96,161.6906,11.8199,RGB,galaxy
+M97,Owl,168.6988,55.019,NB,planetary nebula
+M98,M98,183.4512,14.9005,RGB,galaxy
+M99,M99,184.7068,14.4165,RGB,galaxy
+IC1396,Elephant Trunk,324.745,57.5139,NB,open cluster
+IC1805,Heart,38.21,61.4711,NB,open cluster
+IC1848,Soul,42.855,60.4189,NB,open cluster
+IC434,Horsehead,85.25,-2.5,NB,emission nebula
+IC5070,Pelican,312.75,44.3667,NB,emission nebula
+NGC1499,California,60.825,36.4217,NB,emission nebula
+NGC2237,Rosette,97.6504,4.9807,NB,star cluster
+NGC2264,Cone,100.2171,9.8769,NB,open cluster
+NGC2359,Thor's Helmet,109.625,-13.2267,NB,emission nebula
+NGC253,Sculptor,11.8881,-25.2888,RGB,galaxy
+NGC281,Pacman,13.1046,56.565,NB,emission nebula
+NGC3372,Carina,161.2593,-59.6999,NB,emission nebula
+NGC4565,Needle,189.0867,25.9874,RGB,galaxy
+NGC6543,Cat's Eye,269.6392,66.633,NB,planetary nebula
+NGC6888,Crescent,303.0273,38.3549,NB,WR*
+NGC6960,Veil (West),311.4083,30.7083,NB,emission nebula
+NGC6992,Veil (East),314.0792,31.7433,NB,sh
+NGC7000,North America,314.6958,44.33,NB,star cluster
+NGC7293,Helix,337.4106,-20.8372,NB,planetary nebula
+NGC7331,NGC7331,339.2669,34.4158,RGB,galaxy
+NGC7380,Wizard,341.8167,58.125,NB,open cluster
+NGC7635,Bubble,350.2012,61.2017,NB,emission nebula
+NGC7822,NGC7822,0.2858,67.4214,NB,emission nebula
+NGC869,Double Cluster,34.7408,57.1339,RGB,open cluster
+NGC884,Double Cluster,35.5842,57.1489,RGB,open cluster
+NGC891,NGC891,35.6371,42.3483,RGB,galaxy

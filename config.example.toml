@@ -1,0 +1,17 @@
+# Copy this file to config.toml and edit it for your site.
+# config.toml is git-ignored, so your location never gets committed.
+
+site_name  = "My Backyard"
+latitude   = 51.4779      # decimal degrees, north positive
+longitude  = -0.0015      # decimal degrees, east positive
+timezone   = "Europe/London"   # IANA name, e.g. Europe/Amsterdam, America/New_York
+
+# Sun this many degrees below the horizon counts as "dark" (12 = nautical night,
+# 18 = astronomical night — but at high latitudes 18 never happens in summer).
+dark_depression = 12.0
+
+# A target must reach at least this altitude (degrees) to count as "usable".
+min_altitude = 30.0
+
+# Time resolution of the calculation, minutes (smaller = slower, more precise).
+step_minutes = 15
