@@ -67,7 +67,7 @@
     <button id="next">▶</button>
     <button id="todaybtn">Today</button>
     <input type="date" id="dpick">
-    <button id="wxbtn">☁ Load weather</button>
+    <button id="wxbtn" title="Weather auto-loads; click to refresh">☁ weather</button>
     <span class="facts" id="facts"></span>
     <span class="badge" id="chk" title="Self-check of the in-browser astronomy vs precomputed values"></span>
   </div>
@@ -102,7 +102,8 @@
 <script>
 const DATA = __EYESUP_DATA__;
 const S = DATA.site, FOV = DATA.fov;
-let WX = null;   // loaded weather, keyed by ISO hour "YYYY-MM-DDTHH"
+let WX = null;        // current night's weather, keyed by ISO hour "YYYY-MM-DDTHH"
+let WXcache = {};     // per-night cache, keyed by "YYYY-MM-DD"
 document.getElementById("site").textContent = "· "+S.name+" ("+S.lat.toFixed(2)+"°N)";
 document.getElementById("minalt").textContent = DATA.minAlt;
 
@@ -195,6 +196,7 @@ function render(){
   const nb=items.filter(x=>x.t.type==="NB"), rgb=items.filter(x=>x.t.type==="RGB");
   document.getElementById("nb").innerHTML= nb.length?nb.map(x=>mkrow(x,false)).join(""):'<div class="empty">Nothing usable in the dark tonight.</div>';
   document.getElementById("rgb").innerHTML= rgb.length?rgb.map(x=>mkrow(x,moonBright)).join(""):'<div class="empty">Nothing usable in the dark tonight.</div>';
+  ensureWeather();
   renderTimeline();
   drawHeatmap();
 }
@@ -218,7 +220,7 @@ function renderTimeline(){
   const list=DATA.targets.filter(t=>t.hours[day-1]>0)
     .map(t=>({t,runs:usableRuns(t,win)})).filter(x=>x.runs.length)
     .sort((a,b)=>a.runs[0][0]-b.runs[0][0]).slice(0,18);
-  const W=1000,PADL=118,PADR=14,rowH=20,top=34,H=top+list.length*rowH+8;
+  const W=1000,PADL=118,PADR=14,rowH=20,top=(WX?52:34),H=top+list.length*rowH+8;
   const span=win.end-win.start, X=ms=>PADL+(ms-win.start)/span*(W-PADL-PADR);
   let svg='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMinYMin meet">';
   let h0=new Date(win.start); h0.setMinutes(0,0,0); h0=new Date(h0.getTime()+3600000);
@@ -250,18 +252,27 @@ function renderTimeline(){
   host.innerHTML= list.length?svg:'<div class="empty">Nothing clears your horizon during darkness tonight.</div>';
 }
 
-async function loadWeather(){
-  const win=darkWindow(cur); if(!win){alert("No dark window tonight.");return;}
-  const b=document.getElementById("wxbtn"); b.textContent="☁ …";
-  const d0=win.start.toISOString().slice(0,10), d1=win.end.toISOString().slice(0,10);
-  try{
-    const u="https://api.open-meteo.com/v1/forecast?latitude="+S.lat+"&longitude="+S.lon+
-      "&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high&timezone=auto&start_date="+d0+"&end_date="+d1;
-    const r=await fetch(u); const j=await r.json(); WX={};
-    j.hourly.time.forEach((tt,k)=>{WX[tt.slice(0,13)]={low:j.hourly.cloud_cover_low[k],
-      mid:j.hourly.cloud_cover_mid[k],high:j.hourly.cloud_cover_high[k]};});
-    b.textContent="☁ Weather ✓"; renderTimeline();
-  }catch(e){ b.textContent="☁ Weather (offline)"; }
+const wxBtn=s=>{document.getElementById("wxbtn").textContent="☁ "+s;};
+const dayKey=d=>d.toISOString().slice(0,10);
+function inHorizon(){const t=new Date();t.setHours(12,0,0,0);const dd=(cur-t)/86400000;return dd>=-1&&dd<=15;}
+function fetchWeather(win){
+  const u="https://api.open-meteo.com/v1/forecast?latitude="+S.lat+"&longitude="+S.lon+
+    "&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high&timezone=auto"+
+    "&start_date="+dayKey(win.start)+"&end_date="+dayKey(win.end);
+  return fetch(u).then(r=>r.json()).then(j=>{const w={};
+    j.hourly.time.forEach((tt,k)=>{w[tt.slice(0,13)]={low:j.hourly.cloud_cover_low[k],
+      mid:j.hourly.cloud_cover_mid[k],high:j.hourly.cloud_cover_high[k]};});return w;});
+}
+// Auto-load weather for the selected night (cached; only within forecast range).
+function ensureWeather(){
+  const key=dayKey(cur);
+  if(WXcache[key]!==undefined){WX=WXcache[key];wxBtn(WX?"weather ✓":"offline");return;}
+  WX=null;
+  if(!inHorizon()){wxBtn("no forecast");return;}
+  const win=darkWindow(cur); if(!win){wxBtn("no forecast");return;}
+  wxBtn("loading…");
+  fetchWeather(win).then(w=>{WXcache[key]=w; if(dayKey(cur)===key){WX=w;wxBtn("weather ✓");renderTimeline();}})
+    .catch(()=>{wxBtn("offline");});
 }
 
 // ---------- year heatmap ----------
@@ -287,7 +298,7 @@ document.getElementById("prev").onclick=()=>{cur.setDate(cur.getDate()-1);render
 document.getElementById("next").onclick=()=>{cur.setDate(cur.getDate()+1);render();};
 document.getElementById("todaybtn").onclick=()=>{cur=new Date();cur.setHours(12,0,0,0);render();};
 document.getElementById("dpick").onchange=e=>{cur=new Date(e.target.value+"T12:00");render();};
-document.getElementById("wxbtn").onclick=loadWeather;
+document.getElementById("wxbtn").onclick=()=>{delete WXcache[dayKey(cur)];ensureWeather();renderTimeline();};
 document.querySelectorAll("#seg button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("#seg button").forEach(x=>x.classList.remove("on"));
   b.classList.add("on");hmType=b.dataset.t;drawHeatmap();});
