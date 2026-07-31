@@ -88,6 +88,14 @@
 </div></header>
 
 <div class="wrap">
+  <div class="card"><h2>Astro darkness — this year
+    <span style="color:var(--muted);font-weight:400;font-size:12px">· local time, evening → morning</span></h2>
+    <div id="darkwrap" style="padding:10px 12px 8px">
+      <canvas id="darkcanvas" style="width:100%;display:block"></canvas>
+      <div class="legend" style="margin-top:6px">Each column is a night of the year; vertical is time. The dark core is astronomical
+      night (Sun below −18°) — at your latitude it never turns fully black around midsummer. Bright line = today; dashed = selected date.</div>
+    </div></div>
+
   <div class="card"><h2>🟢 Up right now
     <span id="nowhdr" style="color:var(--muted);font-weight:400;font-size:12px"></span></h2>
     <div class="rows" id="nowlist" style="max-height:none"></div></div>
@@ -247,6 +255,7 @@ function render(){
   renderTimeline();
   renderForecast();
   drawHeatmap();
+  paintDarkness();
 }
 
 // ---------- timeline ----------
@@ -403,6 +412,64 @@ function drawHeatmap(){
   document.getElementById("hm").innerHTML='<table>'+head+body+'</table>';
 }
 
+// ---------- astro darkness (year gradient) ----------
+// Sky brightness from Sun altitude: day -> light blue, astronomical night -> near-black.
+function skyColor(a){
+  const b=Math.pow(a>=0?1:(a<=-18?0:1+a/18), 0.9);
+  const night=[7,10,17], day=[130,180,232];
+  return night.map((v,i)=>Math.round(v+(day[i]-v)*b));
+}
+const DK={T0:15*60, T1:33*60, CW:365, CH:180};   // y spans 15:00 -> 09:00 next day
+let darkGrid=null;                               // cached offscreen gradient (compute once)
+function buildDarkGrid(){
+  const off=document.createElement("canvas"); off.width=DK.CW; off.height=DK.CH;
+  const octx=off.getContext("2d"), img=octx.createImageData(DK.CW,DK.CH), data=img.data;
+  const yr=new Date().getFullYear();
+  for(let x=0;x<DK.CW;x++) for(let y=0;y<DK.CH;y++){
+    const d=new Date(yr,0,1,0,0,0,0); d.setDate(1+x);
+    d.setMinutes(DK.T0+(y/(DK.CH-1))*(DK.T1-DK.T0));
+    const c=skyColor(sunAlt(d)), o=(y*DK.CW+x)*4;
+    data[o]=c[0]; data[o+1]=c[1]; data[o+2]=c[2]; data[o+3]=255;
+  }
+  octx.putImageData(img,0,0); darkGrid=off;
+}
+function paintDarkness(){
+  if(!darkGrid) return;
+  const cv=document.getElementById("darkcanvas"), wrap=document.getElementById("darkwrap");
+  const dpr=Math.min(2,window.devicePixelRatio||1), cssW=Math.max(320,wrap.clientWidth-24), cssH=180;
+  cv.style.height=cssH+"px"; cv.width=Math.round(cssW*dpr); cv.height=Math.round(cssH*dpr);
+  const ctx=cv.getContext("2d");
+  const L=Math.round(40*dpr), R=Math.round(8*dpr), Tp=Math.round(6*dpr), Bp=Math.round(20*dpr);
+  const pw=cv.width-L-R, ph=cv.height-Tp-Bp, yr=new Date().getFullYear();
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.imageSmoothingEnabled=true; ctx.drawImage(darkGrid,L,Tp,pw,ph);
+  ctx.strokeStyle="#28323f"; ctx.lineWidth=1; ctx.strokeRect(L+.5,Tp+.5,pw,ph);
+  ctx.font=(10*dpr)+"px system-ui,-apple-system,Segoe UI,Roboto,sans-serif"; ctx.fillStyle="#93a1b0";
+  const xOfDay=d0=>L+d0/365*pw, yOf=mm=>Tp+(mm-DK.T0)/(DK.T1-DK.T0)*ph;
+  ctx.textBaseline="middle"; ctx.textAlign="right";
+  [[900,"15:00"],[1080,"18:00"],[1260,"21:00"],[1440,"00:00"],[1620,"03:00"],[1800,"06:00"],[1980,"09:00"]].forEach(([mm,lab])=>{
+    const y=yOf(mm); ctx.strokeStyle="rgba(255,255,255,0.09)";
+    ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(L+pw,y); ctx.stroke();
+    ctx.fillText(lab, L-4*dpr, y);
+  });
+  ctx.textBaseline="top"; ctx.textAlign="center";
+  const ML="JFMAMJJASOND", mon0=m=>(Date.UTC(yr,m,1)-Date.UTC(yr,0,1))/86400000;
+  for(let m=0;m<12;m++){
+    const a=mon0(m), b=m<11?mon0(m+1):365, x=xOfDay(a);
+    ctx.strokeStyle="rgba(255,255,255,0.07)"; ctx.beginPath(); ctx.moveTo(x,Tp); ctx.lineTo(x,Tp+ph); ctx.stroke();
+    ctx.fillText(ML[m], xOfDay((a+b)/2), Tp+ph+3*dpr);
+  }
+  const dayIndex=dt=>(Date.UTC(dt.getFullYear(),dt.getMonth(),dt.getDate())-Date.UTC(yr,0,1))/86400000;
+  const clampDay=v=>Math.max(0,Math.min(365,v));
+  const tx=xOfDay(clampDay(dayIndex(new Date())));
+  ctx.strokeStyle="#8ab4ff"; ctx.lineWidth=1.5*dpr; ctx.beginPath(); ctx.moveTo(tx,Tp); ctx.lineTo(tx,Tp+ph); ctx.stroke();
+  if(dayIndex(cur)!==dayIndex(new Date())){
+    const sx=xOfDay(clampDay(dayIndex(cur)));
+    ctx.strokeStyle="rgba(230,237,243,0.6)"; ctx.setLineDash([4*dpr,3*dpr]); ctx.lineWidth=dpr;
+    ctx.beginPath(); ctx.moveTo(sx,Tp); ctx.lineTo(sx,Tp+ph); ctx.stroke(); ctx.setLineDash([]);
+  }
+}
+
 // ---------- up right now (live) ----------
 function updateNow(){
   const now=new Date(), sa=sunAlt(now), dark=sa<-DATA.darkDep, mn=moon(now);
@@ -524,7 +591,8 @@ document.querySelectorAll("#typefilter button").forEach(b=>b.onclick=()=>{
   if(FILTER!=="all"){hmType=FILTER;
     document.querySelectorAll("#seg button").forEach(x=>x.classList.toggle("on",x.dataset.t===FILTER));}
   render();updateNow();});
-selfCheck(); render(); updateNow(); setInterval(updateNow, 60000);
+let dkTimer; window.addEventListener("resize",()=>{clearTimeout(dkTimer);dkTimer=setTimeout(paintDarkness,150);});
+selfCheck(); buildDarkGrid(); render(); updateNow(); setInterval(updateNow, 60000);
 </script>
 </body>
 </html>
