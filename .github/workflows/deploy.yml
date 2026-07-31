@@ -1,0 +1,84 @@
+name: Build & deploy to bunny.net
+
+# Rebuilds the app and pushes it to a bunny.net storage zone (served via a pull
+# zone / CDN). The build output is fully deterministic, so this only needs to run
+# when the app, catalogue, build script, or your private inputs change — hence
+# push-to-main plus a manual trigger, with no timer.
+#
+# Your location never touches this public repo: config.toml and horizon.csv are
+# restored from secrets at build time, and only the built HTML is uploaded.
+#
+# Required repo settings (Settings → Secrets and variables → Actions):
+#   Secrets:
+#     EYESUP_CONFIG       full contents of your config.toml
+#     EYESUP_HORIZON      full contents of your horizon.csv
+#     BUNNY_STORAGE_KEY   storage-zone password (read/write)
+#     BUNNY_PURGE_KEY     bunny.net account API key (for cache purge)
+#   Variables:
+#     BUNNY_STORAGE_ZONE      your storage-zone name
+#     BUNNY_STORAGE_ENDPOINT  storage endpoint, e.g. storage.bunnycdn.com
+#     BUNNY_PULLZONE_ID       numeric pull-zone id
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - template.html
+      - build.py
+      - targets.csv
+      - requirements.txt
+      - .github/workflows/deploy.yml
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Restore private inputs from secrets
+        env:
+          EYESUP_CONFIG: ${{ secrets.EYESUP_CONFIG }}
+          EYESUP_HORIZON: ${{ secrets.EYESUP_HORIZON }}
+        run: |
+          printf '%s' "$EYESUP_CONFIG" > config.toml
+          printf '%s' "$EYESUP_HORIZON" > horizon.csv
+
+      - name: Build
+        run: python build.py
+
+      - name: Upload to bunny.net storage as index.html
+        env:
+          KEY: ${{ secrets.BUNNY_STORAGE_KEY }}
+          ZONE: ${{ vars.BUNNY_STORAGE_ZONE }}
+          ENDPOINT: ${{ vars.BUNNY_STORAGE_ENDPOINT }}
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' \
+            -X PUT "https://${ENDPOINT}/${ZONE}/index.html" \
+            -H "AccessKey: ${KEY}" \
+            -H "Content-Type: text/html" \
+            --data-binary @dist/eyesup.html)
+          echo "upload HTTP $code"
+          test "$code" = "201" || test "$code" = "200"
+
+      - name: Purge CDN cache
+        env:
+          PURGE_KEY: ${{ secrets.BUNNY_PURGE_KEY }}
+          PZID: ${{ vars.BUNNY_PULLZONE_ID }}
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' \
+            -X POST "https://api.bunny.net/pullzone/${PZID}/purgeCache" \
+            -H "AccessKey: ${PURGE_KEY}")
+          echo "purge HTTP $code"
+          test "$code" = "204" || test "$code" = "200"
