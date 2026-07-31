@@ -17,7 +17,7 @@ config/horizon are git-ignored by default.
     python build.py
 """
 from __future__ import annotations
-import csv, json, math, sys, tomllib
+import csv, json, math, os, sys, tomllib
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import numpy as np
@@ -149,6 +149,7 @@ def main():
     }
     data["targets"].sort(key=lambda t: -max(t["hours"]))
 
+    os.makedirs("dist", exist_ok=True)
     json.dump(data, open("dist/data.json", "w"), separators=(",", ":"))
     html = open("template.html").read().replace(
         "__EYESUP_DATA__", json.dumps(data, separators=(",", ":")))
