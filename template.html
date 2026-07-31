@@ -258,7 +258,7 @@ function renderTimeline(){
   const win=darkWindow(cur), host=document.getElementById("tl"), sub=document.getElementById("tlsub");
   if(!win){host.innerHTML='<div class="empty">No darkness this night (Sun never '+DATA.darkDep+'° below the horizon).</div>';sub.textContent="";return;}
   sub.textContent="dark "+hhmm(win.start)+"–"+hhmm(win.end)+
-    (WX?" · cloud ribbon: green=clear → red=overcast (low+mid cloud %)":"");
+    (WX?" · cloud ribbon: green=clear → red=overcast (total cloud %)":"");
   const day=doy(cur);
   const list=DATA.targets.filter(t=>t.hours[day-1]>0&&passes(t))
     .map(t=>({t,runs:usableRuns(t,win)})).filter(x=>x.runs.length)
@@ -273,10 +273,10 @@ function renderTimeline(){
   }
   if(WX){
     for(let t=win.start.getTime();t<win.end.getTime();t+=3600000){
-      const key=new Date(t).toISOString().slice(0,13),c=WX[key];
+      const c=WX[hourKey(new Date(t))];
       if(c==null)continue;
-      const block=Math.max(c.low,c.mid),x0=X(t),x1=X(t+3600000),w=x1-x0;
-      svg+='<rect x="'+x0+'" y="1" width="'+w+'" height="17" fill="'+cloudColor(block)+'" stroke="#0b0f16" stroke-width="0.5"><title>'+hhmm(new Date(t))+'  low '+c.low+'% · mid '+c.mid+'% · high '+c.high+'%</title></rect>';
+      const block=c.total,x0=X(t),x1=X(t+3600000),w=x1-x0;
+      svg+='<rect x="'+x0+'" y="1" width="'+w+'" height="17" fill="'+cloudColor(block)+'" stroke="#0b0f16" stroke-width="0.5"><title>'+hhmm(new Date(t))+'  '+c.total+'% cloud (low '+c.low+' · mid '+c.mid+' · high '+c.high+')</title></rect>';
       if(w>16) svg+='<text x="'+((x0+x1)/2)+'" y="13.5" fill="#0b0f16" font-size="10" text-anchor="middle">'+block+'</text>';
     }
     svg+='<text x="'+(PADL-4)+'" y="13.5" fill="#93a1b0" font-size="10" text-anchor="end">cloud%</text>';
@@ -333,8 +333,8 @@ function fetchForecastWeather(nights){
   const apply=w=>windowed.forEach(({n,i})=>{
     let sum=0,cnt=0;
     for(let t=n.win.start.getTime();t<n.win.end.getTime();t+=3600000){
-      const c=w[new Date(t).toISOString().slice(0,13)]; if(c==null)continue;
-      sum+=Math.max(c.low,c.mid); cnt++;
+      const c=w[hourKey(new Date(t))]; if(c==null)continue;
+      sum+=c.total; cnt++;
     }
     if(!cnt){mark(i,"—");return;}
     const avg=Math.round(sum/cnt);
@@ -343,24 +343,28 @@ function fetchForecastWeather(nights){
   const key=first+"_"+last;
   if(FCwx[key]){apply(FCwx[key]);return;}
   const u="https://api.open-meteo.com/v1/forecast?latitude="+S.lat+"&longitude="+S.lon+
-    "&hourly=cloud_cover_low,cloud_cover_mid&timezone=auto&start_date="+first+"&end_date="+last;
+    "&hourly=cloud_cover&timezone=auto&start_date="+first+"&end_date="+last;
   fetch(u).then(r=>r.json()).then(j=>{
     if(!j.hourly){nights.forEach((n,i)=>mark(i,"—"));return;}
-    const w={}; j.hourly.time.forEach((tt,k)=>{w[tt.slice(0,13)]={low:j.hourly.cloud_cover_low[k],mid:j.hourly.cloud_cover_mid[k]};});
+    const w={}; j.hourly.time.forEach((tt,k)=>{w[tt.slice(0,13)]={total:j.hourly.cloud_cover[k]};});
     FCwx[key]=w; apply(w);
   }).catch(()=>windowed.forEach(({i})=>mark(i,"offline")));
 }
 function jumpTo(iso){cur=new Date(iso+"T12:00");render();}
 
 const wxBtn=s=>{document.getElementById("wxbtn").textContent="☁ "+s;};
-const dayKey=d=>d.toISOString().slice(0,10);
+// Open-Meteo is queried with timezone=auto, so its hourly labels are LOCAL time.
+// Match them with local-time keys, not UTC (getTime/toISOString would offset them).
+const pad2=n=>String(n).padStart(2,"0");
+const dayKey=d=>d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate());
+const hourKey=d=>dayKey(d)+"T"+pad2(d.getHours());
 function inHorizon(){const t=new Date();t.setHours(12,0,0,0);const dd=(cur-t)/86400000;return dd>=-1&&dd<=15;}
 function fetchWeather(win){
   const u="https://api.open-meteo.com/v1/forecast?latitude="+S.lat+"&longitude="+S.lon+
-    "&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high&timezone=auto"+
+    "&hourly=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high&timezone=auto"+
     "&start_date="+dayKey(win.start)+"&end_date="+dayKey(win.end);
   return fetch(u).then(r=>r.json()).then(j=>{const w={};
-    j.hourly.time.forEach((tt,k)=>{w[tt.slice(0,13)]={low:j.hourly.cloud_cover_low[k],
+    j.hourly.time.forEach((tt,k)=>{w[tt.slice(0,13)]={total:j.hourly.cloud_cover[k],low:j.hourly.cloud_cover_low[k],
       mid:j.hourly.cloud_cover_mid[k],high:j.hourly.cloud_cover_high[k]};});return w;});
 }
 // Auto-load weather for the selected night (cached; only within forecast range).
