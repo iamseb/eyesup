@@ -38,6 +38,7 @@
   .nm span{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .nm a{color:var(--accent);font-size:11px;text-decoration:none}
   .nm .tag{display:inline-block;font-size:10px}
+  .nm .moonwarn{display:inline;font-size:11px;color:var(--warn)}
   .nowrow .nm{flex:0 1 230px}
   .spark{flex:1;min-width:0;background:#0e131b;border:1px solid var(--line);border-radius:6px;overflow:hidden}
   .spark svg{display:block;width:100%;height:56px}
@@ -57,17 +58,27 @@
     background:repeating-linear-gradient(135deg,rgba(79,143,247,.10) 0 10px,transparent 10px 20px),var(--panel)}
   .sw{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin:0 3px 0 8px}
   #clouds .cur{position:absolute;top:-3px;bottom:-3px;width:1.5px;margin-left:-.75px}
-  .hmhead{display:flex;align-items:center;gap:10px;margin:16px 0 8px}
+  .hmhead{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;margin:16px 0 8px}
   .seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
   .seg button{border:none;border-radius:0;background:var(--panel)}
   .seg button.on{background:var(--accent);color:#04122b}
   .grid{overflow:auto;border:1px solid var(--line);border-radius:10px}
   table{border-collapse:collapse;font-size:11px}
+  /* full width: fixed name column, 52 week columns share the rest (scrolls below ~9px a week) */
+  .grid table{width:100%;table-layout:fixed;min-width:calc(140px + 52 * 9px)}
+  .grid th.lbl{width:140px}
+  details.card>summary{list-style:none;cursor:pointer;padding:12px 14px;font-size:15px;font-weight:600;
+    display:flex;align-items:center;gap:8px}
+  details.card>summary::-webkit-details-marker{display:none}
+  details.card>summary::before{content:"▸";color:var(--muted);width:10px}
+  details.card[open]>summary::before{content:"▾"}
+  details.card[open]>summary{border-bottom:1px solid var(--line)}
+  .yearbody{padding:0 14px 14px}
   .grid td,.grid th{padding:0}
   .lbl{position:sticky;left:0;background:var(--panel);padding:2px 8px!important;white-space:nowrap;
-    border-right:1px solid var(--line);z-index:1}
+    border-right:1px solid var(--line);z-index:1;overflow:hidden;text-overflow:ellipsis}
   .mon{color:var(--muted);text-align:center;height:18px}
-  .cell{width:15px;height:15px}
+  .cell{height:15px}
   .nowcol{outline:2px solid var(--accent);outline-offset:-2px}
   .legend{color:var(--muted);font-size:11px;margin-top:6px}
   a{color:var(--accent)}
@@ -143,25 +154,31 @@
       <div class="rows" id="rgb"></div></div>
   </div>
 
-  <div class="hmhead">
-    <b>Year view</b>
-    <span class="seg" id="seg"><button data-t="NB" class="on">Narrowband</button><button data-t="RGB">RGB</button></span>
-    <span class="legend">usable dark hours — darker = more. Outlined column is this week.</span>
-  </div>
-  <div class="grid" id="hm"></div>
+  <details class="card" id="yearfold">
+    <summary>Year views <span style="color:var(--muted);font-weight:400;font-size:12px">· usable hours per target ·
+      darkness through the year</span></summary>
+    <div class="yearbody">
+      <div class="hmhead">
+        <b>Usable hours by week</b>
+        <span class="seg" id="seg"><button data-t="NB" class="on">Narrowband</button><button data-t="RGB">RGB</button></span>
+        <span class="legend">usable dark hours — darker = more. Outlined column is this week.</span>
+      </div>
+      <div class="grid" id="hm"></div>
+
+      <div class="hmhead"><b>Astro darkness — this year</b>
+        <span class="legend">· local time, evening → morning</span></div>
+      <div id="darkwrap">
+        <canvas id="darkcanvas" style="width:100%;display:block"></canvas>
+        <div class="legend" style="margin-top:6px">Each column is a night of the year; vertical is time. The dark core is astronomical
+        night (Sun below −18°) — at your latitude it never turns fully black around midsummer. Bright line = today; dashed = selected date.</div>
+      </div>
+    </div>
+  </details>
 
   <p class="legend">Built from your measured local horizon. “Usable” = above your obstructions and above
   <span id="minalt"></span>° altitude, during darkness. Previews are DSS2 survey cutouts framed to your
   field of view (a framing check); “examples” links to real narrowband/RGB shots on AstroBin. Weather is
   live from Open-Meteo. Times are your local time. Tap any target for details.</p>
-
-  <div class="card"><h2>Astro darkness — this year
-    <span style="color:var(--muted);font-weight:400;font-size:12px">· local time, evening → morning</span></h2>
-    <div id="darkwrap" style="padding:10px 12px 8px">
-      <canvas id="darkcanvas" style="width:100%;display:block"></canvas>
-      <div class="legend" style="margin-top:6px">Each column is a night of the year; vertical is time. The dark core is astronomical
-      night (Sun below −18°) — at your latitude it never turns fully black around midsummer. Bright line = today; dashed = selected date.</div>
-    </div></div>
 </div>
 
 <div id="modal" onclick="if(event.target===this)closeModal()"><div class="sheet" id="sheet"></div></div>
@@ -493,7 +510,7 @@ function buildDarkGrid(){
 function paintDarkness(){
   if(!darkGrid) return;
   const cv=document.getElementById("darkcanvas"), wrap=document.getElementById("darkwrap");
-  const dpr=Math.min(2,window.devicePixelRatio||1), cssW=Math.max(320,wrap.clientWidth-24), cssH=180;
+  const dpr=Math.min(2,window.devicePixelRatio||1), cssW=Math.max(320,wrap.clientWidth), cssH=180;
   cv.style.height=cssH+"px"; cv.width=Math.round(cssW*dpr); cv.height=Math.round(cssH*dpr);
   const ctx=cv.getContext("2d");
   const L=Math.round(40*dpr), R=Math.round(8*dpr), Tp=Math.round(6*dpr), Bp=Math.round(20*dpr);
@@ -789,6 +806,8 @@ document.querySelectorAll("#typefilter button").forEach(b=>b.onclick=()=>{
 document.getElementById("scrub").oninput=e=>{ if(!NIGHTWIN)return;
   SIM=new Date(NIGHTWIN.start.getTime()+e.target.value*60000); onSimChange(); };
 document.getElementById("scrubnow").onclick=()=>{ SIM=null; onSimChange(); };
+// The year chart sizes itself from its container, which has no width while the fold-out is closed.
+document.getElementById("yearfold").addEventListener("toggle",e=>{if(e.target.open)paintDarkness();});
 let dkTimer; window.addEventListener("resize",()=>{clearTimeout(dkTimer);dkTimer=setTimeout(()=>{paintNight();paintDarkness();},150);});
 selfCheck(); buildDarkGrid(); render(); updateNow(); setInterval(updateNow, 60000);
 </script>
