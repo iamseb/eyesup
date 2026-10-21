@@ -483,7 +483,7 @@ function paintDarkness(){
 function nightWindow(base){
   const start=new Date(base); start.setHours(12,0,0,0);
   let set=null,rise=null,prev=sunAlt(start);
-  for(let i=1;i<=600;i++){                 // step 2 min out to ~20 h
+  for(let i=1;i<=720;i++){                 // step 2 min out to next noon (winter sunrise can be after 08:00)
     const t=new Date(start.getTime()+i*120000), a=sunAlt(t);
     if(set===null && prev>=0 && a<0) set=t;
     if(set!==null && prev<0 && a>=0){ rise=t; break; }
@@ -505,7 +505,7 @@ function sunCross(win, targetAlt, dusk){
 function paintNight(){
   const cv=document.getElementById("nightcanvas"), wrap=document.getElementById("nightwrap"), sub=document.getElementById("nightsub");
   const win=nightWindow(cur);
-  if(!win){ cv.style.display="none"; sub.textContent="· Sun never sets on this date."; return; }
+  if(!win){ cv.style.display="none"; sub.textContent="· Sun never "+(sunAlt(cur)>=0?"sets":"rises")+" on this date."; return; }
   cv.style.display="block";
   const dpr=Math.min(2,window.devicePixelRatio||1), cssW=Math.max(320,wrap.clientWidth-24), cssH=88;
   cv.style.height=cssH+"px"; cv.width=Math.round(cssW*dpr); cv.height=Math.round(cssH*dpr);
