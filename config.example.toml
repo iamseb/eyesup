@@ -21,3 +21,24 @@ step_minutes = 15
 #   height = 57.3 * sensor_height_mm / focal_length_mm
 fov_width_deg = 2.0
 fov_height_deg = 1.33
+
+# ---- Weather verdict — the same method and defaults as SkyGuard ----
+# Two Open-Meteo models: a high-resolution primary and a cross-check. A night is 🟢
+# only when both agree. KNMI HARMONIE covers the Netherlands and surroundings for
+# ~2.5 days; elsewhere (or further out) nights fall back to the secondary alone, 🟡 at best.
+primary_model   = "knmi_harmonie_arome_netherlands"
+secondary_model = "ecmwf_ifs025"
+low_cloud_max   = 20            # % — an hour is usable only with low cloud at or below this…
+mid_cloud_max   = 50            # % — …and mid cloud at or below this (high cloud doesn't gate)
+high_cloud_confident_max = 60   # % — heavier high cloud drops a night from 🟢 to 🟡
+high_cloud_note = 40            # % — average high cloud above this gets a note
+exposure_start_hour = 18        # gear is outside (must stay dry) from this hour…
+exposure_end_hour   = 9         # …until this hour next morning
+precip_amount_max = 0.0         # mm — any forecast rain above this in that window is a no-go
+precip_prob_max   = 0           # % — any rain chance above this is a no-go
+wind_sustained_warn_kmh = 25
+wind_gust_warn_kmh      = 40
+wind_gust_veto_kmh      = 55    # gusts above this are a no-go
+min_usable_hours   = 2
+min_continuous_run = 2
+confident_min_run  = 2

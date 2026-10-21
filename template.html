@@ -50,6 +50,12 @@
   #clouds .cb{position:absolute;top:0;height:100%;color:#0b0f16;text-align:center;line-height:18px;overflow:hidden;
     box-shadow:inset -0.5px 0 0 #0b0f16}
   #clouds .msg{color:var(--muted);font-size:12px;line-height:18px}
+  #clouds .gust{position:absolute;top:1px;right:1px;font-size:8px;line-height:1}
+  .rainhatch{background:repeating-linear-gradient(135deg,#4f8ff7 0 4px,#2350a8 4px 8px)}
+  .dryhatch{background:repeating-linear-gradient(135deg,rgba(79,143,247,.38) 0 4px,rgba(35,80,168,.38) 4px 8px)}
+  #wxcard.rain{border-color:#4f8ff7;
+    background:repeating-linear-gradient(135deg,rgba(79,143,247,.10) 0 10px,transparent 10px 20px),var(--panel)}
+  .sw{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin:0 3px 0 8px}
   #clouds .cur{position:absolute;top:-3px;bottom:-3px;width:1.5px;margin-left:-.75px}
   .hmhead{display:flex;align-items:center;gap:10px;margin:16px 0 8px}
   .seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
@@ -101,9 +107,12 @@
 </div></header>
 
 <div class="wrap">
-  <div class="card"><h2>Clouds <span style="color:var(--muted);font-weight:400;font-size:12px">· imaging impact,
-    green = clear → red = overcast · high cirrus weighted lighter</span></h2>
-    <div style="padding:10px 12px 10px"><div id="clouds"></div></div></div>
+  <div class="card" id="wxcard"><h2>Clouds <span id="wxverdict" style="font-weight:400;font-size:12px"></span></h2>
+    <div style="padding:14px 12px 8px"><div id="clouds"></div>
+      <div class="legend" style="margin-top:8px">Hourly, per SkyGuard:<span class="sw" style="background:#3fb950"></span>clear in
+      both models<span class="sw" style="background:#b8cc4c"></span>clear in one<span class="sw" style="background:hsl(215,10%,45%)"></span>cloudy
+      (darker = more; number = low/mid cloud %)<span class="sw rainhatch"></span>rain<span class="sw dryhatch"></span>dry hour on a rain night ·
+      💨 gusts over the limit. On a no-go night nothing shows as clear.</div></div></div>
 
   <div class="card"><h2>Tonight's darkness <span id="nightsub" style="color:var(--muted);font-weight:400;font-size:12px"></span></h2>
     <div id="nightwrap" style="padding:10px 12px 8px">
@@ -160,8 +169,6 @@
 <script>
 const DATA = __EYESUP_DATA__;
 const S = DATA.site, FOV = DATA.fov;
-let WX = null;        // current night's weather, keyed by ISO hour "YYYY-MM-DDTHH"
-let WXcache = {};     // per-night cache, keyed by "YYYY-MM-DD"
 document.getElementById("site").textContent = "· "+S.name+" ("+S.lat.toFixed(2)+"°N)";
 document.getElementById("minalt").textContent = DATA.minAlt;
 const BYID={}; DATA.targets.forEach(t=>BYID[t.id]=t);
@@ -231,17 +238,6 @@ function cutout(t){return "https://alasky.u-strasbg.fr/hips-image-services/hips2
   Math.round(128*FOV.h/FOV.w)+"&projection=TAN&format=jpg";}
 function astrobin(t){const q=(t.name!==t.id?t.name+" ":"")+t.id.replace(/([A-Za-z]+)(\d+)/,"$1 $2");
   return "https://www.astrobin.com/search/?q="+encodeURIComponent(q.trim());}
-function cloudColor(p){ // 0% clear -> green, 40% -> amber, 80%+ -> red
-  const g=[63,185,80],y=[224,178,55],r=[248,81,73];
-  let c; if(p<=40){const f=p/40;c=g.map((v,i)=>Math.round(v+(y[i]-v)*f));}
-  else{const f=Math.min(1,(p-40)/40);c=y.map((v,i)=>Math.round(v+(r[i]-v)*f));}
-  return "rgb("+c[0]+","+c[1]+","+c[2]+")";}
-// Effective cloud for imaging. Layers overlap, so combine them as independent
-// opacities (never exceeds 100); high cirrus is weighted lighter than the low
-// deck because thin high cloud harms deep-sky far less. Tune weights to taste.
-const CLOUD_W={low:1.0,mid:0.85,high:0.45};
-const cloudImpact=c=>Math.round(100*(1-(1-c.low/100*CLOUD_W.low)*(1-c.mid/100*CLOUD_W.mid)*(1-c.high/100*CLOUD_W.high)));
-
 let cur=new Date(); cur.setHours(12,0,0,0);
 // Night scrubber: SIM is the simulated time (null = live). It belongs to the selected night,
 // so render() drops it whenever the date changes.
@@ -280,7 +276,7 @@ function render(){
   document.getElementById("nbcard").style.display = FILTER==="RGB"?"none":"";
   document.getElementById("rgbcard").style.display = FILTER==="NB"?"none":"";
   document.getElementById("tonightcols").style.gridTemplateColumns = FILTER==="all"?"":"1fr";
-  ensureWeather();
+  loadWeather();
   renderForecast();
   drawHeatmap();
   paintNight();
@@ -307,7 +303,7 @@ function nightTotal(t,win){
 }
 
 // ---------- next-nights outlook ----------
-let FCDAYS=5, FCwx={};                          // forecast span + cached hourly cloud maps
+let FCDAYS=5, FCN=[];                           // forecast span + the nights it shows
 const moonGlyph=age=>["🌑","🌒","🌓","🌔","🌕","🌖","🌗","🌘"][Math.round(age/(29.530588853/8))%8];
 function renderForecast(){
   const host=document.getElementById("forecast"), sub=document.getElementById("fcsub");
@@ -318,8 +314,8 @@ function renderForecast(){
     nights.push({b,day,win,dark:DATA.darkHours[day-1]/10,mn:moon(b),
       usable:DATA.targets.filter(t=>t.hours[day-1]>0&&passes(t)).length});
   }
-  sub.textContent = FILTER==="all"?"dark hours · moon · cloud · usable targets"
-    :FILTER+" only · dark hours · moon · cloud · usable targets";
+  sub.textContent = FILTER==="all"?"dark hours · moon · forecast · usable targets"
+    :FILTER+" only · dark hours · moon · forecast · usable targets";
   const md=new Intl.DateTimeFormat("en-GB",{weekday:"short",day:"numeric",month:"short"});
   host.innerHTML=nights.map((n,i)=>{
     const age=mod(jd(n.b)-2451550.1,29.530588853);
@@ -327,39 +323,10 @@ function renderForecast(){
       '<div class="nm"><b>'+(i===0?"Tonight":md.format(n.b))+'</b>'+
         '<span>dark '+(n.win?hhmm(n.win.start)+'–'+hhmm(n.win.end):'—')+
         ' · '+moonGlyph(age)+' moon '+n.mn.illum+'% '+n.mn.nm+'</span></div>'+
-      '<div class="metric"><span id="fc-cloud-'+i+'" style="color:var(--muted)">cloud …</span><br>'+
+      '<div class="metric"><span id="fc-wx-'+i+'" style="color:var(--muted)">forecast …</span><br>'+
         '<b>'+n.dark.toFixed(1)+' h</b> dark · '+n.usable+' target'+(n.usable===1?'':'s')+'</div></div>';
   }).join("");
-  fetchForecastWeather(nights);
-}
-// One Open-Meteo call spans the whole visible range; bucket cloud into each dark window.
-function fetchForecastWeather(nights){
-  const mark=(i,txt,col)=>{const el=document.getElementById("fc-cloud-"+i);
-    if(el){el.textContent=txt; el.style.color=col||"var(--muted)";}};
-  const windowed=nights.map((n,i)=>({n,i})).filter(x=>x.n.win);
-  if(!windowed.length){nights.forEach((n,i)=>mark(i,"—"));return;}
-  const today=new Date(); today.setHours(12,0,0,0);
-  if((nights[0].b-today)/86400000>16){nights.forEach((n,i)=>mark(i,"no forecast"));return;}
-  const first=dayKey(nights[0].b), last=dayKey(new Date(nights[nights.length-1].b.getTime()+86400000));
-  const apply=w=>windowed.forEach(({n,i})=>{
-    let sum=0,cnt=0;
-    for(let t=n.win.start.getTime();t<n.win.end.getTime();t+=3600000){
-      const c=w[hourKey(new Date(t))]; if(c==null)continue;
-      sum+=cloudImpact(c); cnt++;
-    }
-    if(!cnt){mark(i,"—");return;}
-    const avg=Math.round(sum/cnt);
-    mark(i,avg+"% cloud",cloudColor(avg));
-  });
-  const key=first+"_"+last;
-  if(FCwx[key]){apply(FCwx[key]);return;}
-  const u="https://api.open-meteo.com/v1/forecast?latitude="+S.lat+"&longitude="+S.lon+
-    "&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high&timezone=auto&start_date="+first+"&end_date="+last;
-  fetch(u).then(r=>r.json()).then(j=>{
-    if(!j.hourly){nights.forEach((n,i)=>mark(i,"—"));return;}
-    const w={}; j.hourly.time.forEach((tt,k)=>{w[tt.slice(0,13)]={low:j.hourly.cloud_cover_low[k],mid:j.hourly.cloud_cover_mid[k],high:j.hourly.cloud_cover_high[k]};});
-    FCwx[key]=w; apply(w);
-  }).catch(()=>windowed.forEach(({i})=>mark(i,"offline")));
+  FCN=nights; markForecast();
 }
 function jumpTo(iso){cur=new Date(iso+"T12:00");render();}
 
@@ -369,25 +336,118 @@ const wxBtn=s=>{document.getElementById("wxbtn").textContent="☁ "+s;};
 const pad2=n=>String(n).padStart(2,"0");
 const dayKey=d=>d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate());
 const hourKey=d=>dayKey(d)+"T"+pad2(d.getHours());
-function inHorizon(){const t=new Date();t.setHours(12,0,0,0);const dd=(cur-t)/86400000;return dd>=-1&&dd<=15;}
-function fetchWeather(win){
+// ---------- weather: SkyGuard's method ----------
+// Two Open-Meteo models: a high-resolution primary and a cross-check. An hour is usable in a model
+// when low and mid cloud are at or under their caps (high cloud doesn't gate); 🟢 needs both models
+// to agree on a run with modest high cloud. Any rain — or a missing rain forecast — across the
+// gear-out window, or gusts over the limit, makes the night a no-go. Thresholds: config.toml.
+const WXC=DATA.wx;
+let WXH=null, WXstate="idle";      // hourly records keyed "YYYY-MM-DDTHH" (local); idle|loading|ok|offline
+const modelName=m=>({knmi_harmonie_arome_netherlands:"KNMI",ecmwf_ifs025:"ECMWF"})[m]||m;
+function loadWeather(force){
+  if(WXstate==="loading"||(WXstate==="ok"&&!force))return;
+  WXstate="loading"; wxBtn("loading…"); renderWeather();
   const u="https://api.open-meteo.com/v1/forecast?latitude="+S.lat+"&longitude="+S.lon+
-    "&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high&timezone=auto"+
-    "&start_date="+dayKey(win.start)+"&end_date="+dayKey(win.end);
-  return fetch(u).then(r=>r.json()).then(j=>{const w={};
-    j.hourly.time.forEach((tt,k)=>{w[tt.slice(0,13)]={low:j.hourly.cloud_cover_low[k],
-      mid:j.hourly.cloud_cover_mid[k],high:j.hourly.cloud_cover_high[k]};});return w;});
+    "&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high,precipitation,precipitation_probability,"+
+    "wind_speed_10m,wind_gusts_10m&models="+WXC.models.join(",")+"&timezone=auto&past_days=1&forecast_days=16";
+  fetch(u).then(r=>r.json()).then(j=>{WXH=parseWeather(j);WXstate="ok";wxBtn("weather ✓");})
+    .catch(()=>{WXstate="offline";wxBtn("offline");}).finally(renderWeather);
 }
-// Auto-load weather for the selected night (cached; only within forecast range).
-function ensureWeather(){
-  const key=dayKey(cur);
-  if(WXcache[key]!==undefined){WX=WXcache[key];wxBtn(WX?"weather ✓":"offline");return;}
-  WX=null;
-  if(!inHorizon()){wxBtn("no forecast");return;}
-  const win=darkWindow(cur); if(!win){wxBtn("no forecast");return;}
-  wxBtn("loading…");
-  fetchWeather(win).then(w=>{WXcache[key]=w; if(dayKey(cur)===key){WX=w;wxBtn("weather ✓");renderClouds();}})
-    .catch(()=>{WXcache[key]=null; if(dayKey(cur)===key){wxBtn("offline");renderClouds();}});
+// WEATHER-JUDGE-START (sliced out by the parity test)
+function parseWeather(j){
+  const h=j.hourly, [P,Q]=WXC.models;
+  // Multi-model responses suffix each field with the model id; single-model ones don't.
+  const at=(f,m,k)=>((h[f+"_"+m]||h[f]||[])[k])??null;
+  const lay=(m,k)=>({low:at("cloud_cover_low",m,k),mid:at("cloud_cover_mid",m,k),high:at("cloud_cover_high",m,k)});
+  const both=(f,k)=>[at(f,P,k),at(f,Q,k)];
+  const w={};
+  h.time.forEach((tt,k)=>{w[tt.slice(0,13)]={p:lay(P,k),s:lay(Q,k),mm:both("precipitation",k),
+    prob:both("precipitation_probability",k),wind:both("wind_speed_10m",k),gust:both("wind_gusts_10m",k)};});
+  return w;
+}
+const pyRound=x=>{const r=Math.round(x);return Math.abs(x%1)===0.5&&r%2?r-1:r;};   // Python's round(): halves to even
+const maxOf=a=>{const v=a.filter(x=>x!=null);return v.length?Math.max(...v):null;};
+function layerUsable(L,strict){                 // true/false, or null when the model has no data
+  if(L.low==null&&L.mid==null&&L.high==null)return null;
+  if(L.low!=null&&L.low>WXC.lowMax)return false;
+  if(L.mid!=null&&L.mid>WXC.midMax)return false;
+  if(strict&&L.high!=null&&L.high>WXC.highConfMax)return false;
+  return true;
+}
+const hasCloud=h=>layerUsable(h.p)!==null||layerUsable(h.s)!==null;
+const rainUnknown=h=>h.mm.every(v=>v==null)||h.prob.every(v=>v==null);
+const rainy=h=>(maxOf(h.mm)??0)>WXC.precipMm||(maxOf(h.prob)??0)>WXC.precipProb;
+const isWet=h=>rainUnknown(h)||rainy(h);         // fail safe: no rain forecast counts as wet
+const okBoth=(h,strict)=>layerUsable(h.p,strict)===true&&layerUsable(h.s,strict)===true;
+const okAny=h=>layerUsable(h.p)===true||layerUsable(h.s)===true;
+function longestRun(flags,times){
+  let best=0,bestAt=null,n=0,at=null;
+  flags.forEach((f,i)=>{if(f){if(!n)at=times[i];n++;if(n>best){best=n;bestAt=at;}}else{n=0;at=null;}});
+  return [best,bestAt];
+}
+// Verdict for the night starting on the evening of `base` (SkyGuard's score_night, minus its setup window).
+function judgeNight(base){
+  if(!WXH)return null;
+  const d0=new Date(base); d0.setHours(12,0,0,0);
+  const es=new Date(d0); es.setHours(WXC.expStart);
+  const ee=new Date(d0); ee.setDate(ee.getDate()+1); ee.setHours(WXC.expEnd);
+  const dark=[],times=[],exp=[],expT=[],seen=new Set(); let expMissing=0;
+  for(let ms=d0.getTime();ms<d0.getTime()+864e5;ms+=36e5){
+    const t=new Date(ms), k=hourKey(t), h=WXH[k];
+    if(seen.has(k))continue; seen.add(k);   // clocks going back repeat a local hour; Open-Meteo lists it once
+    if(t>=es&&t<ee){ if(h){exp.push(h);expT.push(t);} else expMissing++; }
+    if(h&&sunAlt(t)<=-DATA.darkDep){dark.push(h);times.push(t);}
+  }
+  if(!dark.some(hasCloud))return {none:true};
+  const conf=dark.map(h=>okBoth(h)), any=dark.map(okAny), strict=dark.map(h=>okBoth(h,true));
+  const [run,runAt]=longestRun(conf,times), [runAny,runAnyAt]=longestRun(any,times), [runStrict]=longestRun(strict,times);
+  const nConf=conf.filter(Boolean).length, nAny=any.filter(Boolean).length;
+  const unknown=exp.filter(rainUnknown).length+expMissing, wetAt=exp.findIndex(isWet);
+  const rain=unknown>0||wetAt>=0;
+  const gust=pyRound(maxOf(exp.flatMap(h=>h.gust))??0), wind=pyRound(maxOf(exp.flatMap(h=>h.wind))??0);
+  const windy=gust>WXC.gustVeto;
+  const skyOk=(nConf>=WXC.minHours&&run>=WXC.minRun)||(nAny>=WXC.minHours&&runAny>=WXC.minRun);
+  const qualifies=!rain&&!windy&&skyOk, confident=qualifies&&runStrict>=WXC.confMinRun;
+  const tentative=!(nConf>=WXC.minHours&&run>=WXC.minRun);
+  const bothCover=dark.every(h=>h.p.low!=null&&h.s.low!=null);
+  const highs=dark.map(h=>h.p.high??h.s.high).filter(v=>v!=null);
+  const firstRain=exp.findIndex(rainy);
+  return {
+    light: confident?"go":qualifies?"maybe":"no",
+    cause: qualifies?null:rain?"rain":windy?"wind":"cloud",
+    reason: !bothCover?modelName(WXC.models[dark.every(h=>h.s.low!=null)?1:0])+" only"
+      : run<WXC.confMinRun?"models disagree":"heavy high cloud",
+    hours: tentative?nAny:nConf, run: tentative?runAny:run, runAt: tentative?runAnyAt:runAt,
+    rainAt: firstRain>=0?expT[firstRain]:null, rainUnknown: unknown,
+    rainMm: maxOf(exp.flatMap(h=>h.mm))??0, rainProb: maxOf(exp.flatMap(h=>h.prob)),
+    gust, wind, breezy: wind>WXC.windWarn||gust>WXC.gustWarn,
+    highNote: highs.length>0&&highs.reduce((a,b)=>a+b,0)/highs.length>WXC.highNote,
+    nConf, nAny, runConf:run, runAnyLen:runAny, runStrict, rain, windy,
+    expWin: hhmm(es)+"–"+hhmm(ee),
+  };
+}
+// WEATHER-JUDGE-END
+// One verdict line, shared by the cloud card header and the Next-nights chips.
+function verdictText(v,short){
+  if(!v)return WXstate==="offline"?["forecast offline","var(--muted)"]:["forecast …","var(--muted)"];
+  if(v.none)return ["no forecast","var(--muted)"];
+  const runTxt=v.runAt?hhmm(v.runAt)+"–"+hhmm(new Date(v.runAt.getTime()+v.run*36e5)):"";
+  const notes=(v.breezy?" · breezy (gusts "+v.gust+" km/h)":"")+(v.highNote?" · thin high cloud":"");
+  if(v.light==="go")return [short?"🟢 "+v.hours+" h clear":"🟢 Go — "+v.hours+" h usable, best run "+runTxt+notes,"var(--nb)"];
+  if(v.light==="maybe")return [short?"🟡 "+v.hours+" h · "+v.reason:"🟡 Maybe — "+v.hours+" h usable ("+runTxt+"), "+v.reason+notes,"var(--warn)"];
+  if(v.cause==="rain"){
+    if(short)return ["🌧 rain — no-go","#6ea8ff"];
+    const what=v.rainAt?"rain forecast from "+hhmm(v.rainAt)+" ("+v.rainMm.toFixed(1)+" mm"+(v.rainProb!=null?" · "+v.rainProb+"%":"")+")"
+      :"rain forecast incomplete";
+    return ["🌧 No-go — "+what+" while gear is out "+v.expWin,"#6ea8ff"];
+  }
+  if(v.cause==="wind")return [short?"💨 gusts "+v.gust+" km/h":"💨 No-go — gusts to "+v.gust+" km/h","#f85149"];
+  return [short?"☁ cloudy":"☁ No-go — too cloudy ("+v.hours+" h usable)","var(--muted)"];
+}
+function renderWeather(){ renderClouds(); markForecast(); }
+function markForecast(){
+  FCN.forEach((n,i)=>{const el=document.getElementById("fc-wx-"+i); if(!el)return;
+    const [txt,col]=verdictText(judgeNight(n.b),true); el.textContent=txt; el.style.color=col;});
 }
 
 // ---------- year heatmap ----------
@@ -549,18 +609,30 @@ function onSimChange(){ paintNight(); renderClouds(); updateNow(); }
 
 // ---------- cloud strip (same time span and inset as the darkness bar) ----------
 function renderClouds(){
-  const host=document.getElementById("clouds"), win=NIGHTWIN;
+  const host=document.getElementById("clouds"), win=NIGHTWIN, v=judgeNight(cur);
+  const [txt,col]=verdictText(v,false), vEl=document.getElementById("wxverdict");
+  vEl.textContent="· "+txt; vEl.style.color=col;
+  document.getElementById("wxcard").classList.toggle("rain",!!v&&v.cause==="rain");
   if(!win){host.innerHTML='<div class="msg">No night on this date.</div>';return;}
-  if(!WX){const key=dayKey(cur);
-    host.innerHTML='<div class="msg">'+(!inHorizon()?"No cloud forecast this far out."
-      : WXcache[key]===undefined?"Loading cloud forecast…":"Cloud forecast unavailable (offline).")+'</div>';return;}
+  if(!WXH||v.none){host.innerHTML='<div class="msg">'+(WXstate==="offline"?"Cloud forecast unavailable (offline)."
+    : !WXH?"Loading cloud forecast…":"No cloud forecast for this night.")+'</div>';return;}
   const t0=win.start.getTime(), t1=win.end.getTime(), P=ms=>(Math.min(Math.max(ms,t0),t1)-t0)/(t1-t0)*100;
+  const nogo=v.light==="no", [Pm,Qm]=WXC.models.map(modelName), L=o=>"L"+(o.low??"–")+" M"+(o.mid??"–")+" H"+(o.high??"–");
   let h0=new Date(win.start); h0.setMinutes(0,0,0), html='';
   for(let t=h0.getTime();t<t1;t+=3600000){
-    const c=WX[hourKey(new Date(t))]; if(c==null)continue;
-    const block=cloudImpact(c), l=P(t), w=P(t+3600000)-l;
-    html+='<div class="cb" style="left:'+l.toFixed(2)+'%;width:'+w.toFixed(2)+'%;background:'+cloudColor(block)+'" title="'+
-      hhmm(new Date(t))+'  impact '+block+'% (low '+c.low+' · mid '+c.mid+' · high '+c.high+')">'+block+'</div>';
+    const h=WXH[hourKey(new Date(t))]; if(!h||!hasCloud(h))continue;
+    const cover=Math.max(h.p.low??h.s.low??0,h.p.mid??h.s.mid??0), l=P(t), w=P(t+3600000)-l;
+    // A no-go night shows no clear hours: dry hours on a rain night get a faded rain hatch,
+    // and clear hours on a gusty or too-cloudy night fall through to grey.
+    let bg, fg="#0b0f16", label=cover, cls="cb";
+    if(!rainUnknown(h)&&rainy(h)){cls+=" rainhatch"; bg=""; fg="#fff"; label="🌧";}
+    else if(nogo&&v.cause==="rain"){cls+=" dryhatch"; bg=""; fg="#e6edf3";}
+    else if(!nogo&&okBoth(h))bg="#3fb950"; else if(!nogo&&okAny(h))bg="#b8cc4c";
+    else{const lt=62-34*cover/100; bg="hsl(215,10%,"+lt.toFixed(0)+"%)"; if(lt<48)fg="#e6edf3";}
+    const tip=hhmm(new Date(t))+" · "+Pm+" "+L(h.p)+" · "+Qm+" "+L(h.s)+" · rain "+(maxOf(h.mm)??"–")+" mm / "+
+      (maxOf(h.prob)??"–")+"% · gust "+(maxOf(h.gust)??"–")+" km/h";
+    html+='<div class="'+cls+'" style="left:'+l.toFixed(2)+'%;width:'+w.toFixed(2)+'%;'+(bg?'background:'+bg+';':'')+'color:'+fg+'" title="'+tip+'">'+label+
+      ((maxOf(h.gust)??0)>WXC.gustVeto?'<span class="gust">💨</span>':'')+'</div>';
   }
   const n=simNow().getTime();
   if(n>=t0&&n<=t1)html+='<div class="cur" style="left:'+P(n).toFixed(2)+'%;background:'+cursorCol()+'"></div>';
@@ -699,7 +771,7 @@ document.getElementById("prev").onclick=()=>{cur.setDate(cur.getDate()-1);render
 document.getElementById("next").onclick=()=>{cur.setDate(cur.getDate()+1);render();};
 document.getElementById("todaybtn").onclick=()=>{cur=new Date();cur.setHours(12,0,0,0);render();};
 document.getElementById("dpick").onchange=e=>{cur=new Date(e.target.value+"T12:00");render();};
-document.getElementById("wxbtn").onclick=()=>{delete WXcache[dayKey(cur)];ensureWeather();renderClouds();};
+document.getElementById("wxbtn").onclick=()=>loadWeather(true);
 document.querySelectorAll("#seg button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll("#seg button").forEach(x=>x.classList.remove("on"));
   b.classList.add("on");hmType=b.dataset.t;drawHeatmap();});
