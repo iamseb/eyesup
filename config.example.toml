@@ -42,3 +42,11 @@ wind_gust_veto_kmh      = 55    # gusts above this are a no-go
 min_usable_hours   = 2
 min_continuous_run = 2
 confident_min_run  = 2
+# Mist, fog and haze — cloud cover misses water droplets near the ground. KNMI
+# HARMONIE forecasts visibility (ECMWF doesn't; the dew-point spread stands in).
+fog_visibility_m  = 1000        # m — fog in either model makes an hour unusable
+mist_visibility_m = 20000       # m — mist keeps an hour usable but drops the night to 🟡
+mist_spread_c     = 1.5         # °C — air this close to its dew point counts as mist when no model gives visibility
+aod_haze_max      = 0.3         # aerosol optical depth (CAMS) — dust or smoke above this is hazy, like mist
+dew_spread_c      = 2.0         # °C — reported: dew (or frost) likely, fit the heaters
+jet_seeing_kmh    = 150         # km/h at 250 hPa — reported: fast jet stream, poor seeing

@@ -54,6 +54,7 @@
   #clouds .gust{position:absolute;top:1px;right:1px;font-size:8px;line-height:1}
   .rainhatch{background:repeating-linear-gradient(135deg,#4f8ff7 0 4px,#2350a8 4px 8px)}
   .dryhatch{background:repeating-linear-gradient(135deg,rgba(79,143,247,.38) 0 4px,rgba(35,80,168,.38) 4px 8px)}
+  .hazehatch{background-image:repeating-linear-gradient(0deg,rgba(255,255,255,.34) 0 2px,transparent 2px 5px)}
   #wxcard.rain{border-color:#4f8ff7;
     background:repeating-linear-gradient(135deg,rgba(79,143,247,.10) 0 10px,transparent 10px 20px),var(--panel)}
   .sw{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin:0 3px 0 8px}
@@ -121,8 +122,9 @@
   <div class="card" id="wxcard"><h2>Clouds <span id="wxverdict" style="font-weight:400;font-size:12px"></span></h2>
     <div style="padding:14px 12px 8px"><div id="clouds"></div>
       <div class="legend" style="margin-top:8px">Hourly, per SkyGuard:<span class="sw" style="background:#3fb950"></span>clear in
-      both models<span class="sw" style="background:#b8cc4c"></span>clear in one<span class="sw" style="background:hsl(215,10%,45%)"></span>cloudy
-      (darker = more; number = low/mid cloud %)<span class="sw rainhatch"></span>rain<span class="sw dryhatch"></span>dry hour on a rain night ·
+      both models<span class="sw hazehatch" style="background-color:#3fb950"></span>clear but hazy (mist, dust/smoke or
+      heavy high cloud)<span class="sw" style="background:#b8cc4c"></span>clear in one<span class="sw" style="background:hsl(215,10%,45%)"></span>cloudy
+      (darker = more; number = low/mid cloud %) · 🌫 fog<span class="sw rainhatch"></span>rain<span class="sw dryhatch"></span>dry hour on a rain night ·
       💨 gusts over the limit. On a no-go night nothing shows as clear.</div></div></div>
 
   <div class="card"><h2>Tonight's darkness <span id="nightsub" style="color:var(--muted);font-weight:400;font-size:12px"></span></h2>
@@ -355,9 +357,10 @@ const dayKey=d=>d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate());
 const hourKey=d=>dayKey(d)+"T"+pad2(d.getHours());
 // ---------- weather: SkyGuard's method ----------
 // Two Open-Meteo models: a high-resolution primary and a cross-check. An hour is usable in a model
-// when low and mid cloud are at or under their caps (high cloud doesn't gate); 🟢 needs both models
-// to agree on a run with modest high cloud. Any rain — or a missing rain forecast — across the
-// gear-out window, or gusts over the limit, makes the night a no-go. Thresholds: config.toml.
+// when low and mid cloud are at or under their caps (high cloud doesn't gate) and there's no fog;
+// 🟢 needs both models to agree on a run with modest high cloud and no mist or dust/smoke haze.
+// Any rain — or a missing rain forecast — across the gear-out window, or gusts over the limit,
+// makes the night a no-go. Thresholds: config.toml.
 const WXC=DATA.wx;
 let WXH=null, WXstate="idle";      // hourly records keyed "YYYY-MM-DDTHH" (local); idle|loading|ok|offline
 const modelName=m=>({knmi_harmonie_arome_netherlands:"KNMI",ecmwf_ifs025:"ECMWF"})[m]||m;
@@ -366,24 +369,39 @@ function loadWeather(force){
   WXstate="loading"; wxBtn("loading…"); renderWeather();
   const u="https://api.open-meteo.com/v1/forecast?latitude="+S.lat+"&longitude="+S.lon+
     "&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high,precipitation,precipitation_probability,"+
-    "wind_speed_10m,wind_gusts_10m&models="+WXC.models.join(",")+"&timezone=auto&past_days=1&forecast_days=16";
-  fetch(u).then(r=>r.json()).then(j=>{WXH=parseWeather(j);WXstate="ok";wxBtn("weather ✓");})
+    "wind_speed_10m,wind_gusts_10m,visibility,temperature_2m,dew_point_2m,wind_speed_250hPa"+
+    "&models="+WXC.models.join(",")+"&timezone=auto&past_days=1&forecast_days=16";
+  // Aerosols (CAMS, ~5 days) are a quality signal, not a safety one: if they fail, skip the haze check.
+  const a="https://air-quality-api.open-meteo.com/v1/air-quality?latitude="+S.lat+"&longitude="+S.lon+
+    "&hourly=aerosol_optical_depth&timezone=auto&past_days=1&forecast_days=7";
+  const aq=fetch(a).then(r=>r.ok?r.json():null).catch(()=>null);
+  fetch(u).then(r=>r.json()).then(j=>aq.then(q=>{WXH=parseWeather(j,q);WXstate="ok";wxBtn("weather ✓");}))
     .catch(()=>{WXstate="offline";wxBtn("offline");}).finally(renderWeather);
 }
 // WEATHER-JUDGE-START (sliced out by the parity test)
-function parseWeather(j){
-  const h=j.hourly, [P,Q]=WXC.models;
+function parseWeather(j,aq){
+  const h=j.hourly, [P,Q]=WXC.models, aod={};
+  if(aq&&aq.hourly)aq.hourly.time.forEach((tt,k)=>{aod[tt.slice(0,13)]=aq.hourly.aerosol_optical_depth[k]??null;});
   // Multi-model responses suffix each field with the model id; single-model ones don't.
   const at=(f,m,k)=>((h[f+"_"+m]||h[f]||[])[k])??null;
   const lay=(m,k)=>({low:at("cloud_cover_low",m,k),mid:at("cloud_cover_mid",m,k),high:at("cloud_cover_high",m,k)});
   const both=(f,k)=>[at(f,P,k),at(f,Q,k)];
   const w={};
   h.time.forEach((tt,k)=>{w[tt.slice(0,13)]={p:lay(P,k),s:lay(Q,k),mm:both("precipitation",k),
-    prob:both("precipitation_probability",k),wind:both("wind_speed_10m",k),gust:both("wind_gusts_10m",k)};});
+    prob:both("precipitation_probability",k),wind:both("wind_speed_10m",k),gust:both("wind_gusts_10m",k),
+    vis:both("visibility",k),temp:both("temperature_2m",k),dew:both("dew_point_2m",k),jet:both("wind_speed_250hPa",k),
+    aod:aod[tt.slice(0,13)]??null};});
   return w;
 }
 const pyRound=x=>{const r=Math.round(x);return Math.abs(x%1)===0.5&&r%2?r-1:r;};   // Python's round(): halves to even
 const maxOf=a=>{const v=a.filter(x=>x!=null);return v.length?Math.max(...v):null;};
+const minOf=a=>{const v=a.filter(x=>x!=null);return v.length?Math.min(...v):null;};
+// Mist, fog and haze: per hour, not per model — only one model may forecast visibility.
+const fogged=h=>h.vis.some(v=>v!=null&&v<WXC.fogVis);
+const spreadOf=h=>minOf(h.temp.map((t,i)=>t!=null&&h.dew[i]!=null?t-h.dew[i]:null));   // temp − dew point
+const misty=h=>{const v=minOf(h.vis); if(v!=null)return v<WXC.mistVis; const sp=spreadOf(h); return sp!=null&&sp<=WXC.mistSpread;};
+const aeroHazy=h=>h.aod!=null&&h.aod>WXC.aodMax;
+const hazy=h=>misty(h)||aeroHazy(h);
 function layerUsable(L,strict){                 // true/false, or null when the model has no data
   if(L.low==null&&L.mid==null&&L.high==null)return null;
   if(L.low!=null&&L.low>WXC.lowMax)return false;
@@ -395,8 +413,16 @@ const hasCloud=h=>layerUsable(h.p)!==null||layerUsable(h.s)!==null;
 const rainUnknown=h=>h.mm.every(v=>v==null)||h.prob.every(v=>v==null);
 const rainy=h=>(maxOf(h.mm)??0)>WXC.precipMm||(maxOf(h.prob)??0)>WXC.precipProb;
 const isWet=h=>rainUnknown(h)||rainy(h);         // fail safe: no rain forecast counts as wet
-const okBoth=(h,strict)=>layerUsable(h.p,strict)===true&&layerUsable(h.s,strict)===true;
-const okAny=h=>layerUsable(h.p)===true||layerUsable(h.s)===true;
+function modelOk(h,L,strict){                 // a model's verdict for the hour: cloud, then fog, then (strict) haze
+  const u=layerUsable(L,strict);
+  if(u===null)return null;
+  if(fogged(h)||(strict&&hazy(h)))return false;
+  return u;
+}
+const okBoth=(h,strict)=>modelOk(h,h.p,strict)===true&&modelOk(h,h.s,strict)===true;
+const okAny=h=>modelOk(h,h.p)===true||modelOk(h,h.s)===true;
+// What keeps a usable hour out of the confident tier.
+const dimmedBy=h=>misty(h)?"mist":aeroHazy(h)?"dust or smoke haze":okBoth(h)&&!okBoth(h,true)?"heavy high cloud":null;
 function longestRun(flags,times){
   let best=0,bestAt=null,n=0,at=null;
   flags.forEach((f,i)=>{if(f){if(!n)at=times[i];n++;if(n>best){best=n;bestAt=at;}}else{n=0;at=null;}});
@@ -429,11 +455,24 @@ function judgeNight(base){
   const bothCover=dark.every(h=>h.p.low!=null&&h.s.low!=null);
   const highs=dark.map(h=>h.p.high??h.s.high).filter(v=>v!=null);
   const firstRain=exp.findIndex(rainy);
+  // The commonest reason usable hours miss the confident tier (ties: alphabetical, as SkyGuard).
+  const causes=dark.filter(okAny).map(dimmedBy).filter(Boolean);
+  let dimmed=null; [...new Set(causes)].sort().forEach(c=>{
+    if(dimmed===null||causes.filter(x=>x===c).length>causes.filter(x=>x===dimmed).length)dimmed=c;});
+  // Fog rules the night out when it's forecast and the low cloud stays within its limit on average.
+  const lows=dark.map(h=>h.p.low??h.s.low).filter(v=>v!=null);
+  const mistAt=dark.findIndex(misty), fogAt=dark.findIndex(fogged);
+  const foggy=fogAt>=0&&lows.length>0&&pyRound(lows.reduce((a,b)=>a+b,0)/lows.length)<=WXC.lowMax;
+  const jet=maxOf(dark.flatMap(h=>h.jet));
   return {
     light: confident?"go":qualifies?"maybe":"no",
-    cause: qualifies?null:rain?"rain":windy?"wind":"cloud",
+    cause: qualifies?null:rain?"rain":windy?"wind":foggy?"fog":"cloud",
     reason: !bothCover?modelName(WXC.models[dark.every(h=>h.s.low!=null)?1:0])+" only"
-      : run<WXC.confMinRun?"models disagree":"heavy high cloud",
+      : run<WXC.confMinRun?"models disagree":dimmed||"heavy high cloud",
+    mistFrom: mistAt>=0?times[mistAt]:null, fogFrom: fogAt>=0?times[fogAt]:null,
+    minVis: minOf(dark.flatMap(h=>h.vis)), minSpread: minOf(dark.map(spreadOf)),
+    minTemp: minOf(dark.flatMap(h=>h.temp)), aodMax: maxOf(dark.map(h=>h.aod)),
+    jetMax: jet!=null?pyRound(jet):null,
     hours: tentative?nAny:nConf, run: tentative?runAny:run, runAt: tentative?runAnyAt:runAt,
     rainAt: firstRain>=0?expT[firstRain]:null, rainUnknown: unknown,
     rainMm: maxOf(exp.flatMap(h=>h.mm))??0, rainProb: maxOf(exp.flatMap(h=>h.prob)),
@@ -449,7 +488,8 @@ function verdictText(v,short){
   if(!v)return WXstate==="offline"?["forecast offline","var(--muted)"]:["forecast …","var(--muted)"];
   if(v.none)return ["no forecast","var(--muted)"];
   const runTxt=v.runAt?hhmm(v.runAt)+"–"+hhmm(new Date(v.runAt.getTime()+v.run*36e5)):"";
-  const notes=(v.breezy?" · breezy (gusts "+v.gust+" km/h)":"")+(v.highNote?" · thin high cloud":"");
+  const notes=(v.breezy?" · breezy (gusts "+v.gust+" km/h)":"")+(v.highNote?" · thin high cloud":"")+
+    airNotes(v).map(x=>" · "+x).join("");
   if(v.light==="go")return [short?"🟢 "+v.hours+" h clear":"🟢 Go — "+v.hours+" h usable, best run "+runTxt+notes,"var(--nb)"];
   if(v.light==="maybe")return [short?"🟡 "+v.hours+" h · "+v.reason:"🟡 Maybe — "+v.hours+" h usable ("+runTxt+"), "+v.reason+notes,"var(--warn)"];
   if(v.cause==="rain"){
@@ -459,7 +499,20 @@ function verdictText(v,short){
     return ["🌧 No-go — "+what+" while gear is out "+v.expWin,"#6ea8ff"];
   }
   if(v.cause==="wind")return [short?"💨 gusts "+v.gust+" km/h":"💨 No-go — gusts to "+v.gust+" km/h","#f85149"];
+  if(v.cause==="fog")return [short?"🌫 foggy":"🌫 No-go — fog from "+hhmm(v.fogFrom)+visTxt(v),"var(--muted)"];
   return [short?"☁ cloudy":"☁ No-go — too cloudy ("+v.hours+" h usable)","var(--muted)"];
+}
+const visTxt=v=>v.minVis!=null?" (visibility down to "+(v.minVis/1000).toFixed(1)+" km)":"";
+// Mist, fog, dust or smoke, dew and seeing — only the ones that apply (as SkyGuard's push).
+function airNotes(v){
+  const out=[];
+  if(v.fogFrom&&v.mistFrom&&v.mistFrom<v.fogFrom)out.push("🌫 mist from "+hhmm(v.mistFrom)+", fog from "+hhmm(v.fogFrom)+visTxt(v));
+  else if(v.fogFrom)out.push("🌫 fog from "+hhmm(v.fogFrom)+visTxt(v));
+  else if(v.mistFrom)out.push("🌫 mist from "+hhmm(v.mistFrom)+(v.minVis!=null?visTxt(v):" (air near its dew point)"));
+  if(v.aodMax!=null&&v.aodMax>WXC.aodMax)out.push("dust or smoke haze (AOD "+v.aodMax.toFixed(2)+")");
+  if(v.minSpread!=null&&v.minSpread<=WXC.dewSpread)out.push(v.minTemp!=null&&v.minTemp<=0?"❄ frost likely":"💧 dew likely");
+  if(v.jetMax!=null&&v.jetMax>WXC.jetSeeing)out.push("🌀 jet stream "+v.jetMax+" km/h — poor seeing");
+  return out;
 }
 function renderWeather(){ renderClouds(); markForecast(); }
 function markForecast(){
@@ -641,14 +694,19 @@ function renderClouds(){
     const cover=Math.max(h.p.low??h.s.low??0,h.p.mid??h.s.mid??0), l=P(t), w=P(t+3600000)-l;
     // A no-go night shows no clear hours: dry hours on a rain night get a faded rain hatch,
     // and clear hours on a gusty or too-cloudy night fall through to grey.
+    // Clear hours that are hazy (mist, dust/smoke or heavy high cloud — SkyGuard's ◐) get a haze overlay.
     let bg, fg="#0b0f16", label=cover, cls="cb";
     if(!rainUnknown(h)&&rainy(h)){cls+=" rainhatch"; bg=""; fg="#fff"; label="🌧";}
     else if(nogo&&v.cause==="rain"){cls+=" dryhatch"; bg=""; fg="#e6edf3";}
-    else if(!nogo&&okBoth(h))bg="#3fb950"; else if(!nogo&&okAny(h))bg="#b8cc4c";
+    else if(fogged(h)){bg="hsl(215,10%,40%)"; fg="#e6edf3"; label="🌫";}
+    else if(!nogo&&okBoth(h)){bg="#3fb950"; if(!okBoth(h,true))cls+=" hazehatch";}
+    else if(!nogo&&okAny(h))bg="#b8cc4c";
     else{const lt=62-34*cover/100; bg="hsl(215,10%,"+lt.toFixed(0)+"%)"; if(lt<48)fg="#e6edf3";}
+    const vis=minOf(h.vis), sp=spreadOf(h);
     const tip=hhmm(new Date(t))+" · "+Pm+" "+L(h.p)+" · "+Qm+" "+L(h.s)+" · rain "+(maxOf(h.mm)??"–")+" mm / "+
-      (maxOf(h.prob)??"–")+"% · gust "+(maxOf(h.gust)??"–")+" km/h";
-    html+='<div class="'+cls+'" style="left:'+l.toFixed(2)+'%;width:'+w.toFixed(2)+'%;'+(bg?'background:'+bg+';':'')+'color:'+fg+'" title="'+tip+'">'+label+
+      (maxOf(h.prob)??"–")+"% · gust "+(maxOf(h.gust)??"–")+" km/h · visibility "+(vis!=null?(vis/1000).toFixed(1)+" km":"–")+
+      " · dew spread "+(sp!=null?sp.toFixed(1)+" °C":"–")+(h.aod!=null?" · AOD "+h.aod.toFixed(2):"");
+    html+='<div class="'+cls+'" style="left:'+l.toFixed(2)+'%;width:'+w.toFixed(2)+'%;'+(bg?'background-color:'+bg+';':'')+'color:'+fg+'" title="'+tip+'">'+label+
       ((maxOf(h.gust)??0)>WXC.gustVeto?'<span class="gust">💨</span>':'')+'</div>';
   }
   const n=simNow().getTime();
