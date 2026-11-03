@@ -62,8 +62,9 @@
   .sc-key span{display:inline-flex;align-items:center;gap:5px}
   .sc-key .soft{color:rgba(255,255,255,.72)}
   .sc-key i{display:inline-block;width:18px;height:1.5px;border-radius:1px}
-  .sc-hours{display:grid;margin:8px 0 4px}
-  .sc-h{display:flex;flex-direction:column;align-items:center;font-size:13px;font-weight:500;cursor:default}
+  .sc-hours{position:relative;margin:8px 44px 4px 0}   /* same span as the plots below, so hours line up */
+  .sc-h{position:absolute;top:0;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;
+    font-size:13px;font-weight:500;cursor:default}
   .sc-h .ic{display:flex;align-items:center}
   .sc-h i{display:block;height:2.5px;width:76%;border-radius:2px}
   .sc-h small{font-size:10px;font-weight:400;color:rgba(255,255,255,.72);height:14px;margin-top:3px}
@@ -833,14 +834,16 @@ function renderClouds(){
   const [head,sub]=chartHeadline(v);
   let html='<div class="sc-date">'+fmt.format(cur).toUpperCase()+'</div><div class="sc-head">'+head+'</div><div class="sc-sub">'+sub+'</div>';
 
-  // Hourly verdicts across the dark window: an icon per hour above a bar in the verdict's colour.
-  const darkH=v.darkTimes.map(t=>WXH[hourKey(t)]), icons=darkH.map(iconOf);
-  const size=Math.max(16,Math.min(40,(host.clientWidth-48)/darkH.length*0.62));
+  // Hourly verdicts across the dark window: an icon per hour above a bar in the verdict's colour, each
+  // centred in its hour on the plots' time axis.
+  const darkH=v.darkTimes.map(t=>WXH[hourKey(t)]), icons=darkH.map(iconOf), slot=36e5/(x1-x0)*100;   // % per hour
+  const size=Math.max(16,Math.min(40,(host.clientWidth-92)*slot/100*0.62));
   const key=SC.words.filter(([m])=>m!=="fog"||icons.includes("fog"))
     .map(([m,w])=>'<span>'+iconImg(SC.icon[m],15)+w+'</span>').join("");
   html+='<div class="sc-card"><div class="sc-lab">'+iconImg("clear-night",13,"mut")+'HOURLY<span class="sc-key">'+key+'</span></div>'+
-    '<div class="sc-hours" style="grid-template-columns:repeat('+darkH.length+',1fr)">'+darkH.map((h,i)=>
-      '<div class="sc-h" title="'+hourFigures(v.darkTimes[i],h).join(" · ")+'">'+pad2(v.darkTimes[i].getHours())+
+    '<div class="sc-hours" style="height:'+(24+Math.round(size*1.3)+(WXC.requireSetup?18:4))+'px">'+darkH.map((h,i)=>
+      '<div class="sc-h" style="left:'+(X(+v.darkTimes[i]+18e5)/10).toFixed(2)+'%;width:'+slot.toFixed(2)+'%" title="'+
+      hourFigures(v.darkTimes[i],h).join(" · ")+'">'+pad2(v.darkTimes[i].getHours())+
       '<span class="ic" style="height:'+Math.round(size*1.3)+'px">'+iconImg(SC.icon[icons[i]],size)+'</span>'+
       '<i style="background:'+SC.mark[markOf(h)]+'"></i>'+(WXC.requireSetup?'<small>'+
         (+v.darkTimes[i]===+v.setupStart?"set up":+v.darkTimes[i]===+v.setupEnd?"bed":"")+'</small>':'')+'</div>').join("")+'</div></div>';
