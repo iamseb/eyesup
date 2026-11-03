@@ -27,6 +27,7 @@ on:
       - build.py
       - targets.csv
       - requirements.txt
+      - icons/**
       - .github/workflows/deploy.yml
   workflow_dispatch:
 

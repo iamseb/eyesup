@@ -6,9 +6,9 @@ latitude   = 51.4779      # decimal degrees, north positive
 longitude  = -0.0015      # decimal degrees, east positive
 timezone   = "Europe/London"   # IANA name, e.g. Europe/Amsterdam, America/New_York
 
-# Sun this many degrees below the horizon counts as "dark" (12 = nautical night,
-# 18 = astronomical night — but at high latitudes 18 never happens in summer).
-dark_depression = 12.0
+# Sun this many degrees below the horizon counts as "dark" — the imaging window
+# (18 = astronomical night, 12 = nautical; at ~52°N, 18 never happens mid-May to late July).
+dark_depression = 18.0
 
 # A target must reach at least this altitude (degrees) to count as "usable".
 min_altitude = 30.0
@@ -32,8 +32,9 @@ low_cloud_max   = 20            # % — an hour is usable only with low cloud at
 mid_cloud_max   = 50            # % — …and mid cloud at or below this (high cloud doesn't gate)
 high_cloud_confident_max = 60   # % — heavier high cloud drops a night from 🟢 to 🟡
 high_cloud_note = 40            # % — average high cloud above this gets a note
-exposure_start_hour = 18        # gear is outside (must stay dry) from this hour…
-exposure_end_hour   = 9         # …until this hour next morning
+exposure_start_hour = 22        # telescope is out (must stay dry) from this hour — rain earlier just means setting up later…
+exposure_end_hour   = 7         # …until you're up next morning
+exposure_end_hour_by_evening = { fri = 9, sat = 9 }   # later mornings, by the evening's weekday
 precip_amount_max = 0.0         # mm — any forecast rain above this in that window is a no-go
 precip_prob_max   = 0           # % — any rain chance above this is a no-go
 wind_sustained_warn_kmh = 25
@@ -50,3 +51,13 @@ mist_spread_c     = 1.5         # °C — air this close to its dew point counts
 aod_haze_max      = 0.3         # aerosol optical depth (CAMS) — dust or smoke above this is hazy, like mist
 dew_spread_c      = 2.0         # °C — reported: dew (or frost) likely, fit the heaters
 jet_seeing_kmh    = 150         # km/h at 250 hPa — reported: fast jet stream, poor seeing
+# Worth setting up? Each usable hour is weighted by how much data it gives through each
+# filter (Hα/SII, OIII) next to a clean, moonless hour — mist, haze and moonlight cost
+# time — to give the night's "equivalent clear hours". Below this in every filter, a
+# clear night is a no-go: not worth setting up. The rest are rough physical assumptions.
+worth_it_hours     = 2.0
+mist_depth_km      = 0.5        # assumed depth of the misty layer (forecasts don't say)
+target_airmass     = 1.5        # a typical target, ~40° up
+clear_visibility_m = 50000      # the clearest air the forecast reports
+mist_standin_vis_m = 10000      # assumed visibility when only the dew-point spread says mist
+aod_clean          = 0.1        # clean-air aerosol optical depth, the baseline

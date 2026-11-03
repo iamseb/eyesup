@@ -77,6 +77,7 @@ The Moon is computed live in the browser: narrowband targets ignore it; RGB
 | `template.html` | ✓ | the app (HTML/CSS/JS), data injected at build time |
 | `targets.csv` | ✓ | shared catalogue (Messier + popular narrowband/NGC) |
 | `fetch_catalog.py` | ✓ | regenerate/extend `targets.csv` from SIMBAD |
+| `icons/` | ✓ | weather icons for the cloud chart ([Meteocons](https://github.com/basmilius/weather-icons), MIT) |
 | `config.example.toml`, `horizon.example.csv` | ✓ | templates to copy |
 | `config.toml`, `horizon.csv` | ✗ (ignored) | **your** private inputs |
 | `dist/` | ✗ (ignored) | generated app |
@@ -90,4 +91,6 @@ or re-run `python fetch_catalog.py` to rebuild it from SIMBAD and add more objec
 
 Object coordinates and types from [SIMBAD](https://simbad.u-strasbg.fr/) (CDS,
 Strasbourg). Astronomy computed in NumPy; no online services needed to build or
-run the app.
+run the app. The cloud chart (SkyGuard's, drawn live from Open-Meteo) uses
+[Meteocons](https://github.com/basmilius/weather-icons) weather icons by Bas Milius,
+MIT licence (`icons/LICENSE`), trimmed to their artwork.

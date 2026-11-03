@@ -46,19 +46,39 @@
   .metric{text-align:right;font-variant-numeric:tabular-nums;font-size:13px;white-space:nowrap}
   .empty{color:var(--muted);padding:18px;text-align:center;font-size:13px}
   .moonwarn{color:var(--warn);font-size:11px}
-  /* cloud strip: inset 8px to match the darkness bar's plot area, so hours line up */
-  #clouds{position:relative;height:18px;margin:0 8px;font-size:10px}
-  #clouds .cb{position:absolute;top:0;height:100%;color:#0b0f16;text-align:center;line-height:18px;overflow:hidden;
-    box-shadow:inset -0.5px 0 0 #0b0f16}
-  #clouds .msg{color:var(--muted);font-size:12px;line-height:18px}
-  #clouds .gust{position:absolute;top:1px;right:1px;font-size:8px;line-height:1}
-  .rainhatch{background:repeating-linear-gradient(135deg,#4f8ff7 0 4px,#2350a8 4px 8px)}
-  .dryhatch{background:repeating-linear-gradient(135deg,rgba(79,143,247,.38) 0 4px,rgba(35,80,168,.38) 4px 8px)}
-  .hazehatch{background-image:repeating-linear-gradient(0deg,rgba(255,255,255,.34) 0 2px,transparent 2px 5px)}
+  /* cloud chart: SkyGuard's push chart, drawn live — a night-sky panel of translucent cards */
+  #skychart{position:relative;background:linear-gradient(#0b1330,#27345f);border-radius:12px;padding:14px 12px 10px;
+    color:#fff;touch-action:pan-y}
+  #skychart .msg{color:rgba(255,255,255,.72);font-size:13px;padding:6px 2px}
+  .sc-date{font-size:11px;font-weight:500;letter-spacing:.6px;color:rgba(255,255,255,.72)}
+  .sc-head{font-size:26px;font-weight:500;line-height:1.2;margin:2px 0 4px}
+  .sc-sub{font-size:13px;color:rgba(255,255,255,.72);margin-bottom:4px}
+  .sc-card{background:rgba(255,255,255,.075);border:.5px solid rgba(255,255,255,.09);border-radius:14px;
+    padding:10px 12px 6px;margin-top:8px}
+  .sc-lab{display:flex;align-items:center;flex-wrap:wrap;gap:4px 6px;font-size:11px;font-weight:500;letter-spacing:.3px;
+    color:rgba(255,255,255,.5)}
+  .sc-lab .mut{filter:brightness(0) invert(1);opacity:.5}
+  .sc-key{margin-left:auto;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:2px 12px}
+  .sc-key span{display:inline-flex;align-items:center;gap:5px}
+  .sc-key .soft{color:rgba(255,255,255,.72)}
+  .sc-key i{display:inline-block;width:18px;height:1.5px;border-radius:1px}
+  .sc-hours{display:grid;margin:8px 0 4px}
+  .sc-h{display:flex;flex-direction:column;align-items:center;font-size:13px;font-weight:500;cursor:default}
+  .sc-h .ic{display:flex;align-items:center}
+  .sc-h i{display:block;height:2.5px;width:76%;border-radius:2px}
+  .sc-plot{position:relative;margin:8px 44px 20px 0}
+  .sc-plot svg{display:block;width:100%;height:100%;overflow:visible}
+  .sc-y{position:absolute;right:-44px;font-size:10px;color:rgba(255,255,255,.5);transform:translateY(-50%)}
+  .sc-x{position:absolute;top:100%;margin-top:4px;font-size:10px;color:rgba(255,255,255,.5);transform:translateX(-50%)}
+  .sc-cross{position:absolute;top:0;bottom:0;width:1px;margin-left:-.5px;background:rgba(255,255,255,.6);display:none;
+    pointer-events:none}
+  .sc-foot{font-size:10.5px;color:rgba(255,255,255,.5);margin-top:8px}
+  #sctip{position:absolute;display:none;pointer-events:none;z-index:3;background:rgba(11,15,22,.95);color:var(--ink);
+    border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:12px;line-height:1.5;white-space:nowrap}
+  #sctip b{font-weight:600}
   #wxcard.rain{border-color:#4f8ff7;
     background:repeating-linear-gradient(135deg,rgba(79,143,247,.10) 0 10px,transparent 10px 20px),var(--panel)}
   .sw{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin:0 3px 0 8px}
-  #clouds .cur{position:absolute;top:-3px;bottom:-3px;width:1.5px;margin-left:-.75px}
   .hmhead{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;margin:16px 0 8px}
   .seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
   .seg button{border:none;border-radius:0;background:var(--panel)}
@@ -120,12 +140,13 @@
 
 <div class="wrap">
   <div class="card" id="wxcard"><h2>Clouds <span id="wxverdict" style="font-weight:400;font-size:12px"></span></h2>
-    <div style="padding:14px 12px 8px"><div id="clouds"></div>
-      <div class="legend" style="margin-top:8px">Hourly, per SkyGuard:<span class="sw" style="background:#3fb950"></span>clear in
-      both models<span class="sw hazehatch" style="background-color:#3fb950"></span>clear but hazy (mist, dust/smoke or
-      heavy high cloud)<span class="sw" style="background:#b8cc4c"></span>clear in one<span class="sw" style="background:hsl(215,10%,45%)"></span>cloudy
-      (darker = more; number = low/mid cloud %) · 🌫 fog<span class="sw rainhatch"></span>rain<span class="sw dryhatch"></span>dry hour on a rain night ·
-      💨 gusts over the limit. On a no-go night nothing shows as clear.</div></div></div>
+    <div style="padding:12px"><div id="skychart"></div>
+      <div class="legend" style="margin-top:8px">SkyGuard's chart, drawn live. Each dark hour's bar:<span class="sw"
+      style="background:#30d158"></span>clear in both models<span class="sw" style="background:#ffd60a"></span>hazy (mist,
+      dust/smoke or heavy high cloud)<span class="sw" style="background:#ff9f0a"></span>models differ<span class="sw"
+      style="background:#ff453a"></span>cloudy or fog. Curves are each model's forecast against its limit (dotted);
+      point at the chart for an hour's figures. “Worth” is the night's equivalent clear hours — usable hours weighted
+      for mist, haze and moonlight in each filter.</div></div></div>
 
   <div class="card"><h2>Tonight's darkness <span id="nightsub" style="color:var(--muted);font-weight:400;font-size:12px"></span></h2>
     <div id="nightwrap" style="padding:10px 12px 8px">
@@ -135,7 +156,7 @@
         <span id="scrubread"></span><button id="scrubnow" hidden>Now</button></div>
       <div class="legend" style="margin-top:6px">Sky brightness across the selected night, dusk → dawn. Dashed lines mark
       astronomical dark (Sun below −18°); the blue line is now. Drag the slider to simulate the night — the amber
-      line, the cloud strip and “Up at…” follow it.</div>
+      line, the cloud chart and “Up at…” follow it.</div>
     </div></div>
 
   <div class="card"><h2><span id="nowtitle">🟢 Up right now</span>
@@ -362,6 +383,7 @@ const hourKey=d=>dayKey(d)+"T"+pad2(d.getHours());
 // Any rain — or a missing rain forecast — across the gear-out window, or gusts over the limit,
 // makes the night a no-go. Thresholds: config.toml.
 const WXC=DATA.wx;
+const moonIllumOf=d=>moon(d).illum, moonAltAt=t=>moonAA(t).alt;   // the judge's Moon (stubbed by the parity test)
 let WXH=null, WXstate="idle";      // hourly records keyed "YYYY-MM-DDTHH" (local); idle|loading|ok|offline
 const modelName=m=>({knmi_harmonie_arome_netherlands:"KNMI",ecmwf_ifs025:"ECMWF"})[m]||m;
 function loadWeather(force){
@@ -428,12 +450,35 @@ function longestRun(flags,times){
   flags.forEach((f,i)=>{if(f){if(!n)at=times[i];n++;if(n>best){best=n;bestAt=at;}}else{n=0;at=null;}});
   return [best,bestAt];
 }
+// Worth setting up? An hour's quality through a filter is the fraction of a clean, moonless hour's
+// data it gives: mist (forecast visibility over an assumed layer depth) or aerosol haze, whichever is
+// worse, dims the target; moonlight brightens the sky. Lost light costs time as its square.
+function quality(h,[,nm,moonBg],moonlight){
+  let vis=minOf(h.vis); if(vis==null&&misty(h))vis=WXC.mistStandin;
+  const mist=vis!=null?3.912*WXC.mistDepth*Math.max(0,1000/Math.max(vis,1)-1000/WXC.clearVis):0;
+  const aerosol=Math.max(0,(h.aod||WXC.aodClean)-WXC.aodClean)*Math.pow(550/nm,1.3);
+  const through=Math.exp(-Math.max(mist,aerosol)*WXC.airmass);
+  return through**2/(1+moonBg*moonlight);
+}
+// The Moon's brightness relative to full, from its illuminated % (a half Moon is ~1/10 of full).
+const moonBrightness=illum=>{const a=deg(Math.acos(Math.max(-1,Math.min(1,2*illum/100-1))));
+  return Math.pow(10,-0.4*(0.026*a+4e-9*a**4));};
+// Spans [rise, set) in ms with the Moon above the horizon, sampled every 10 minutes (as SkyGuard).
+function moonSpans(start,end){
+  const spans=[]; let up=null;
+  for(let ms=start.getTime();ms<=end.getTime();ms+=6e5){
+    const isUp=moonAltAt(new Date(ms))>0;
+    if(isUp&&up===null)up=ms; else if(!isUp&&up!==null){spans.push([up,ms]);up=null;}
+  }
+  if(up!==null)spans.push([up,end.getTime()]);
+  return spans;
+}
 // Verdict for the night starting on the evening of `base` (SkyGuard's score_night, minus its setup window).
 function judgeNight(base){
   if(!WXH)return null;
   const d0=new Date(base); d0.setHours(12,0,0,0);
   const es=new Date(d0); es.setHours(WXC.expStart);
-  const ee=new Date(d0); ee.setDate(ee.getDate()+1); ee.setHours(WXC.expEnd);
+  const ee=new Date(d0); ee.setDate(ee.getDate()+1); ee.setHours(WXC.expEndByDay[d0.getDay()]);
   const dark=[],times=[],exp=[],expT=[],seen=new Set(); let expMissing=0;
   for(let ms=d0.getTime();ms<d0.getTime()+864e5;ms+=36e5){
     const t=new Date(ms), k=hourKey(t), h=WXH[k];
@@ -450,7 +495,13 @@ function judgeNight(base){
   const gust=pyRound(maxOf(exp.flatMap(h=>h.gust))??0), wind=pyRound(maxOf(exp.flatMap(h=>h.wind))??0);
   const windy=gust>WXC.gustVeto;
   const skyOk=(nConf>=WXC.minHours&&run>=WXC.minRun)||(nAny>=WXC.minHours&&runAny>=WXC.minRun);
-  const qualifies=!rain&&!windy&&skyOk, confident=qualifies&&runStrict>=WXC.confMinRun;
+  // Equivalent clear hours per filter: usable hours weighted by quality (half if only one model says usable).
+  const illum=moonIllumOf(d0), bright=moonBrightness(illum);
+  const darkEnd=new Date(times[times.length-1].getTime()+36e5), spans=moonSpans(times[0],darkEnd);
+  const moonlight=t=>bright*spans.reduce((s,[a,b])=>s+Math.max(0,Math.min(b,t.getTime()+36e5)-Math.max(a,t.getTime())),0)/36e5;
+  const equivalent=WXC.filters.map(f=>dark.reduce((s,h,i)=>okAny(h)?s+(okBoth(h)?1:0.5)*quality(h,f,moonlight(times[i])):s,0));
+  const worthFilters=WXC.filters.filter((f,i)=>equivalent[i]>=WXC.worthIt).map(f=>f[0]);
+  const qualifies=!rain&&!windy&&skyOk&&worthFilters.length>0, confident=qualifies&&runStrict>=WXC.confMinRun;
   const tentative=!(nConf>=WXC.minHours&&run>=WXC.minRun);
   const bothCover=dark.every(h=>h.p.low!=null&&h.s.low!=null);
   const highs=dark.map(h=>h.p.high??h.s.high).filter(v=>v!=null);
@@ -464,9 +515,14 @@ function judgeNight(base){
   const mistAt=dark.findIndex(misty), fogAt=dark.findIndex(fogged);
   const foggy=fogAt>=0&&lows.length>0&&pyRound(lows.reduce((a,b)=>a+b,0)/lows.length)<=WXC.lowMax;
   const jet=maxOf(dark.flatMap(h=>h.jet));
+  // A clear night that gives too little: what dims it, and its best filter's hours.
+  const why=dimmed||(nConf<nAny?"models disagree":spans.length&&illum>=50?"bright Moon":"too short");
   return {
-    light: confident?"go":qualifies?"maybe":"no",
-    cause: qualifies?null:rain?"rain":windy?"wind":foggy?"fog":"cloud",
+    light: confident?"go":qualifies?"maybe":"no", qualifies,
+    cause: qualifies?null:rain?"rain":windy?"wind":skyOk?"notworth":foggy?"fog":"cloud",
+    notWorth: "not worth setting up ("+why+", ≈"+Math.max(...equivalent).toFixed(1)+" h)",
+    equivalent: WXC.filters.map((f,i)=>[f[0],equivalent[i]]), worthFilters, moonIllum: illum, moonUp: spans.length>0,
+    darkTimes: times, darkStart: times[0], darkEnd, expStart: es, expEnd: ee,
     reason: !bothCover?modelName(WXC.models[dark.every(h=>h.s.low!=null)?1:0])+" only"
       : run<WXC.confMinRun?"models disagree":dimmed||"heavy high cloud",
     mistFrom: mistAt>=0?times[mistAt]:null, fogFrom: fogAt>=0?times[fogAt]:null,
@@ -489,9 +545,10 @@ function verdictText(v,short){
   if(v.none)return ["no forecast","var(--muted)"];
   const runTxt=v.runAt?hhmm(v.runAt)+"–"+hhmm(new Date(v.runAt.getTime()+v.run*36e5)):"";
   const notes=(v.breezy?" · breezy (gusts "+v.gust+" km/h)":"")+(v.highNote?" · thin high cloud":"")+
-    airNotes(v).map(x=>" · "+x).join("");
-  if(v.light==="go")return [short?"🟢 "+v.hours+" h clear":"🟢 Go — "+v.hours+" h usable, best run "+runTxt+notes,"var(--nb)"];
-  if(v.light==="maybe")return [short?"🟡 "+v.hours+" h · "+v.reason:"🟡 Maybe — "+v.hours+" h usable ("+runTxt+"), "+v.reason+notes,"var(--warn)"];
+    airNotes(v).map(x=>" · "+x).join("")+" · "+worthTxt(v);
+  if(v.light==="go")return [short?"🟢 "+v.hours+" h clear"+filterHint(v):"🟢 Go — "+v.hours+" h usable, best run "+runTxt+filterHint(v)+notes,"var(--nb)"];
+  if(v.light==="maybe")return [short?"🟡 "+v.hours+" h · "+v.reason+filterHint(v):"🟡 Maybe — "+v.hours+" h usable ("+runTxt+"), "+v.reason+filterHint(v)+notes,"var(--warn)"];
+  if(v.cause==="notworth")return [short?"🔭 not worth it":"🔭 No-go — "+v.notWorth+airNotes(v).map(x=>" · "+x).join(""),"var(--muted)"];
   if(v.cause==="rain"){
     if(short)return ["🌧 rain — no-go","#6ea8ff"];
     const what=v.rainAt?"rain forecast from "+hhmm(v.rainAt)+" ("+v.rainMm.toFixed(1)+" mm"+(v.rainProb!=null?" · "+v.rainProb+"%":"")+")"
@@ -503,6 +560,10 @@ function verdictText(v,short){
   return [short?"☁ cloudy":"☁ No-go — too cloudy ("+v.hours+" h usable)","var(--muted)"];
 }
 const visTxt=v=>v.minVis!=null?" (visibility down to "+(v.minVis/1000).toFixed(1)+" km)":"";
+// "🔭 worth ≈4.2 h Hα/SII · ≈1.6 h OIII" — equivalent clear hours of clean, moonless sky.
+const worthTxt=v=>"🔭 worth "+v.equivalent.map(([f,x])=>"≈"+x.toFixed(1)+" h "+f).join(" · ");
+// ", Hα/SII only" when the night is worth it for some filters but not all.
+const filterHint=v=>v.worthFilters.length&&v.worthFilters.length<WXC.filters.length?", "+v.worthFilters.join(" & ")+" only":"";
 // Mist, fog, dust or smoke, dew and seeing — only the ones that apply (as SkyGuard's push).
 function airNotes(v){
   const out=[];
@@ -677,41 +738,143 @@ function syncScrub(win){
 }
 function onSimChange(){ paintNight(); renderClouds(); updateNow(); }
 
-// ---------- cloud strip (same time span and inset as the darkness bar) ----------
+// ---------- cloud chart: SkyGuard's push chart, drawn live from the same forecast ----------
+// Icons: Meteocons by Bas Milius (https://github.com/basmilius/weather-icons), MIT licence —
+// Copyright (c) 2020-present Bas Milius; see icons/LICENSE.
+const SC={mark:{"✓":"#30d158","◐":"#ffd60a","~":"#ff9f0a","✗":"#ff453a"},
+  icon:{"✓":"clear-night","◐":"haze-night","~":"partly-cloudy-night","✗":"overcast",fog:"fog"},
+  words:[["✓","clear"],["◐","hazy"],["~","models differ"],["✗","cloudy"],["fog","fog"]],
+  models:["#2a93dc","#e25c84"], names:{knmi_harmonie_arome_netherlands:"KNMI HARMONIE",ecmwf_ifs025:"ECMWF IFS"},
+  visKm:30};                                     // visibility card: 0 to this, clearer air pinned at the top
+// ✓ both models usable, no haze · ◐ both usable but hazy · ~ one model · ✗ neither (fog gets its own icon).
+const markOf=h=>okBoth(h,true)?"✓":okBoth(h)?"◐":okAny(h)?"~":"✗";
+const iconOf=h=>{const m=markOf(h);return m==="✗"&&fogged(h)?"fog":m;};
+// Icons are trimmed to their artwork and drawn at equal area, so a wide cloud and a round moon weigh the same.
+function iconImg(name,size,cls){const ic=DATA.icons[name],k=size/Math.sqrt(ic.w*ic.h);
+  return '<img'+(cls?' class="'+cls+'"':'')+' src="'+ic.uri+'" width="'+(ic.w*k).toFixed(1)+'" height="'+(ic.h*k).toFixed(1)+'" alt="">';}
+// Dense points on a monotone cubic (Fritsch–Carlson): smooth, but never overshoots 0–100% or bends a flat run.
+function monotone(xs,ys,per=8){
+  const n=xs.length; if(n<2)return [xs,ys];
+  const d=xs.slice(1).map((x,i)=>(ys[i+1]-ys[i])/(x-xs[i]));
+  const m=[d[0],...d.slice(1).map((v,i)=>d[i]*v<=0?0:(d[i]+v)/2),d[n-2]];
+  for(let i=0;i<n-1;i++){
+    if(d[i]===0){m[i]=m[i+1]=0;continue;}
+    const a=m[i]/d[i],b=m[i+1]/d[i];
+    if(a*a+b*b>9){const t=3/Math.sqrt(a*a+b*b);m[i]=t*a*d[i];m[i+1]=t*b*d[i];}
+  }
+  const ox=[],oy=[];
+  for(let i=0;i<n-1;i++){const h=xs[i+1]-xs[i];
+    for(let k=0;k<per;k++){const t=k/per;
+      ox.push(xs[i]+t*h);
+      oy.push((2*t**3-3*t**2+1)*ys[i]+(t**3-2*t**2+t)*h*m[i]+(-2*t**3+3*t**2)*ys[i+1]+(t**3-t**2)*h*m[i+1]);}}
+  return [ox.concat(xs[n-1]),oy.concat(ys[n-1])];
+}
+// ('Misty from 21:00', 'Maybe: mist · Hα/SII ≈7.0 h, OIII ≈6.8 h · moon 32%') — SkyGuard's chart header.
+function chartHeadline(v){
+  let head;
+  if(v.qualifies){
+    const end=new Date(v.runAt.getTime()+v.run*36e5), reason=v.light==="go"?"":v.reason;
+    const word=reason.startsWith("mist")?"Misty":reason.startsWith("dust")||reason.startsWith("heavy high cloud")?"Hazy":"Clear";
+    head=v.runAt<=v.darkStart&&end>=v.darkEnd?word+" all night":end>=v.darkEnd?word+" from "+hhmm(v.runAt)
+      :word+" "+hhmm(v.runAt)+"–"+hhmm(end);
+  }else{const s={rain:"rain forecast",wind:"too windy",notworth:v.notWorth,fog:"foggy",cloud:"too cloudy"}[v.cause];
+    head=s.charAt(0).toUpperCase()+s.slice(1).toLowerCase();}
+  const parts=[v.light==="go"?"Confident go":v.light==="maybe"?"Maybe: "+v.reason:"Not tonight"];
+  if(v.nAny)parts.push(v.equivalent.map(([f,x])=>f+" ≈"+x.toFixed(1)+" h").join(", "));
+  if(v.rain)parts.push("rain up to "+v.rainMm.toFixed(1)+" mm"+(v.rainProb!=null?", "+v.rainProb+"% chance":""));
+  else if(v.windy)parts.push("gusts "+v.gust+" km/h");
+  parts.push("moon "+v.moonIllum+"%");
+  return [head,parts.join(" · ")];
+}
+// An hour's figures: plain text for a title, or lines for the chart's tooltip.
+function hourFigures(t,h){
+  const L=o=>"L "+(o.low??"–")+" · M "+(o.mid??"–")+" · H "+(o.high??"–")+" %", vis=minOf(h.vis), sp=spreadOf(h);
+  return [hhmm(t), modelName(WXC.models[0])+" "+L(h.p), modelName(WXC.models[1])+" "+L(h.s),
+    "visibility "+(vis!=null?(vis/1000).toFixed(1)+" km":"–")+" · dew spread "+(sp!=null?sp.toFixed(1)+" °C":"–")+
+      (h.aod!=null?" · AOD "+h.aod.toFixed(2):""),
+    "rain "+(maxOf(h.mm)??"–")+" mm / "+(maxOf(h.prob)??"–")+"% · gusts "+(maxOf(h.gust)??"–")+" km/h"];
+}
+let SCSPAN=null;                                 // the charted hours, for the hover read-out
 function renderClouds(){
-  const host=document.getElementById("clouds"), win=NIGHTWIN, v=judgeNight(cur);
+  const host=document.getElementById("skychart"), v=judgeNight(cur);
   const [txt,col]=verdictText(v,false), vEl=document.getElementById("wxverdict");
   vEl.textContent="· "+txt; vEl.style.color=col;
   document.getElementById("wxcard").classList.toggle("rain",!!v&&v.cause==="rain");
-  if(!win){host.innerHTML='<div class="msg">No night on this date.</div>';return;}
-  if(!WXH||v.none){host.innerHTML='<div class="msg">'+(WXstate==="offline"?"Cloud forecast unavailable (offline)."
+  SCSPAN=null;
+  if(!WXH||!v||v.none){host.innerHTML='<div class="msg">'+(WXstate==="offline"?"Cloud forecast unavailable (offline)."
     : !WXH?"Loading cloud forecast…":"No cloud forecast for this night.")+'</div>';return;}
-  const t0=win.start.getTime(), t1=win.end.getTime(), P=ms=>(Math.min(Math.max(ms,t0),t1)-t0)/(t1-t0)*100;
-  const nogo=v.light==="no", [Pm,Qm]=WXC.models.map(modelName), L=o=>"L"+(o.low??"–")+" M"+(o.mid??"–")+" H"+(o.high??"–");
-  let h0=new Date(win.start); h0.setMinutes(0,0,0), html='';
-  for(let t=h0.getTime();t<t1;t+=3600000){
-    const h=WXH[hourKey(new Date(t))]; if(!h||!hasCloud(h))continue;
-    const cover=Math.max(h.p.low??h.s.low??0,h.p.mid??h.s.mid??0), l=P(t), w=P(t+3600000)-l;
-    // A no-go night shows no clear hours: dry hours on a rain night get a faded rain hatch,
-    // and clear hours on a gusty or too-cloudy night fall through to grey.
-    // Clear hours that are hazy (mist, dust/smoke or heavy high cloud — SkyGuard's ◐) get a haze overlay.
-    let bg, fg="#0b0f16", label=cover, cls="cb";
-    if(!rainUnknown(h)&&rainy(h)){cls+=" rainhatch"; bg=""; fg="#fff"; label="🌧";}
-    else if(nogo&&v.cause==="rain"){cls+=" dryhatch"; bg=""; fg="#e6edf3";}
-    else if(fogged(h)){bg="hsl(215,10%,40%)"; fg="#e6edf3"; label="🌫";}
-    else if(!nogo&&okBoth(h)){bg="#3fb950"; if(!okBoth(h,true))cls+=" hazehatch";}
-    else if(!nogo&&okAny(h))bg="#b8cc4c";
-    else{const lt=62-34*cover/100; bg="hsl(215,10%,"+lt.toFixed(0)+"%)"; if(lt<48)fg="#e6edf3";}
-    const vis=minOf(h.vis), sp=spreadOf(h);
-    const tip=hhmm(new Date(t))+" · "+Pm+" "+L(h.p)+" · "+Qm+" "+L(h.s)+" · rain "+(maxOf(h.mm)??"–")+" mm / "+
-      (maxOf(h.prob)??"–")+"% · gust "+(maxOf(h.gust)??"–")+" km/h · visibility "+(vis!=null?(vis/1000).toFixed(1)+" km":"–")+
-      " · dew spread "+(sp!=null?sp.toFixed(1)+" °C":"–")+(h.aod!=null?" · AOD "+h.aod.toFixed(2):"");
-    html+='<div class="'+cls+'" style="left:'+l.toFixed(2)+'%;width:'+w.toFixed(2)+'%;'+(bg?'background-color:'+bg+';':'')+'color:'+fg+'" title="'+tip+'">'+label+
-      ((maxOf(h.gust)??0)>WXC.gustVeto?'<span class="gust">💨</span>':'')+'</div>';
-  }
-  const n=simNow().getTime();
-  if(n>=t0&&n<=t1)html+='<div class="cur" style="left:'+P(n).toFixed(2)+'%;background:'+cursorCol()+'"></div>';
-  host.innerHTML=html;
+  // Span the gear-out window, widened if darkness starts earlier, so every dark hour is on the chart.
+  const t0=Math.min(v.expStart,v.darkStart), t1=Math.max(v.expEnd,v.darkEnd), span=[], seen=new Set();
+  for(let ms=t0;ms<=t1;ms+=36e5){const k=hourKey(new Date(ms)); if(seen.has(k))continue; seen.add(k);
+    if(WXH[k])span.push({t:ms,h:WXH[k]});}
+  if(span.length<2){host.innerHTML='<div class="msg">No cloud forecast for this night.</div>';return;}
+  const x0=span[0].t, x1=span[span.length-1].t, X=ms=>(ms-x0)/(x1-x0)*1000, Y=val=>(104-val)/106*100;
+  SCSPAN={x0,x1,span};
+  const [head,sub]=chartHeadline(v);
+  let html='<div class="sc-date">'+fmt.format(cur).toUpperCase()+'</div><div class="sc-head">'+head+'</div><div class="sc-sub">'+sub+'</div>';
+
+  // Hourly verdicts across the dark window: an icon per hour above a bar in the verdict's colour.
+  const darkH=v.darkTimes.map(t=>WXH[hourKey(t)]), icons=darkH.map(iconOf);
+  const size=Math.max(16,Math.min(40,(host.clientWidth-48)/darkH.length*0.62));
+  const key=SC.words.filter(([m])=>m!=="fog"||icons.includes("fog"))
+    .map(([m,w])=>'<span>'+iconImg(SC.icon[m],15)+w+'</span>').join("");
+  html+='<div class="sc-card"><div class="sc-lab">'+iconImg("clear-night",13,"mut")+'HOURLY<span class="sc-key">'+key+'</span></div>'+
+    '<div class="sc-hours" style="grid-template-columns:repeat('+darkH.length+',1fr)">'+darkH.map((h,i)=>
+      '<div class="sc-h" title="'+hourFigures(v.darkTimes[i],h).join(" · ")+'">'+pad2(v.darkTimes[i].getHours())+
+      '<span class="ic" style="height:'+Math.round(size*1.3)+'px">'+iconImg(SC.icon[icons[i]],size)+'</span>'+
+      '<i style="background:'+SC.mark[markOf(h)]+'"></i></div>').join("")+'</div></div>';
+
+  // One card per cloud layer, then visibility: both models as smooth curves against the limit.
+  const cards=[["low","LOW CLOUD · LIMIT "+WXC.lowMax+"%",WXC.lowMax,96,["0%","100%"]],
+    ["mid","MID CLOUD · LIMIT "+WXC.midMax+"%",WXC.midMax,40,["0%","100%"]],
+    ["high","HIGH CLOUD · CIRRUS · LIMIT "+WXC.highConfMax+"%",WXC.highConfMax,56,["0%","100%"]]];
+  if(span.some(s=>s.h.vis.some(x=>x!=null)))
+    cards.push(["vis","VISIBILITY · MIST BELOW "+WXC.mistVis/1000+" KM",WXC.mistVis/1000/SC.visKm*100,40,["0 km",SC.visKm+"+ km"]]);
+  const value=(h,m,k)=>k==="vis"?(h.vis[m]==null?null:Math.min(100,h.vis[m]/1000/SC.visKm*100)):(m?h.s:h.p)[k];
+  const now=simNow().getTime(), ns=' vector-effect="non-scaling-stroke"';
+  cards.forEach(([k,label,limit,height,[ylo,yhi]],ci)=>{
+    let svg='<svg viewBox="0 0 1000 100" preserveAspectRatio="none">';
+    const shade=(a,b)=>b>a?'<rect x="'+a.toFixed(1)+'" y="0" width="'+(b-a).toFixed(1)+'" height="100" fill="rgba(0,0,0,.22)"/>':'';
+    svg+=shade(0,X(v.darkStart.getTime()))+shade(X(v.darkEnd.getTime()),1000);   // twilight either side of the dark
+    [0,50,100].forEach(g=>{svg+='<line x1="0" x2="1000" y1="'+Y(g).toFixed(2)+'" y2="'+Y(g).toFixed(2)+'" stroke="rgba(255,255,255,.12)" stroke-width=".5"'+ns+'/>';});
+    svg+='<line x1="0" x2="1000" y1="'+Y(limit).toFixed(2)+'" y2="'+Y(limit).toFixed(2)+'" stroke="rgba(255,255,255,.72)" stroke-width="1.2" stroke-dasharray="0.1 3.6" stroke-linecap="round"'+ns+'/>';
+    [0,1].forEach(m=>{
+      const runs=[]; let run=[];                    // split at gaps in a model's coverage
+      span.forEach(s=>{const y=value(s.h,m,k); if(y==null){if(run.length)runs.push(run);run=[];} else run.push([X(s.t),+y]);});
+      if(run.length)runs.push(run);
+      const gid="scg"+ci+m, c=SC.models[m];
+      svg+='<defs><linearGradient id="'+gid+'" gradientUnits="userSpaceOnUse" x1="0" y1="'+Y(100)+'" x2="0" y2="'+Y(0)+'">'+
+        '<stop offset="0" stop-color="'+c+'" stop-opacity=".24"/><stop offset="1" stop-color="'+c+'" stop-opacity="0"/></linearGradient></defs>';
+      runs.forEach(r=>{const [px,py]=monotone(r.map(p=>p[0]),r.map(p=>p[1]));
+        const d=px.map((x,i)=>(i?"L":"M")+x.toFixed(1)+","+Y(py[i]).toFixed(2)).join("");
+        svg+='<path d="'+d+"L"+px[px.length-1].toFixed(1)+","+Y(0).toFixed(2)+"L"+px[0].toFixed(1)+","+Y(0).toFixed(2)+'Z" fill="url(#'+gid+')"/>'+
+          '<path d="'+d+'" fill="none" stroke="'+c+'" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"'+ns+'/>';});
+    });
+    if(now>=x0&&now<=x1)svg+='<line x1="'+X(now).toFixed(1)+'" x2="'+X(now).toFixed(1)+'" y1="0" y2="100" stroke="'+cursorCol()+'" stroke-width="1.5"'+ns+'/>';
+    const models=ci?'':'<span class="sc-key">'+WXC.models.map((md,m)=>'<span class="soft"><i style="background:'+SC.models[m]+'"></i>'+(SC.names[md]||md)+'</span>').join("")+'</span>';
+    html+='<div class="sc-card"><div class="sc-lab">'+iconImg(k==="vis"?"mist":"cloudy",13,"mut")+label+models+'</div>'+
+      '<div class="sc-plot" style="height:'+height+'px">'+svg+'</svg>'+
+      '<span class="sc-y" style="top:'+Y(0).toFixed(1)+'%">'+ylo+'</span><span class="sc-y" style="top:'+Y(100).toFixed(1)+'%">'+yhi+'</span>'+
+      span.filter(s=>new Date(s.t).getHours()%3===0).map(s=>'<span class="sc-x" style="left:'+(X(s.t)/10).toFixed(2)+'%">'+hhmm(new Date(s.t))+'</span>').join("")+
+      '<div class="sc-cross"></div></div></div>';
+  });
+  host.innerHTML=html+'<div class="sc-foot">Shaded: twilight · icons: Meteocons by Bas Milius</div><div id="sctip"></div>';
+}
+// Hover read-out: a crosshair through every card at the nearest hour, and that hour's figures.
+function chartHover(e){
+  const host=document.getElementById("skychart"), tip=document.getElementById("sctip"), plots=[...host.querySelectorAll(".sc-plot")];
+  const hide=()=>{if(tip)tip.style.display="none"; plots.forEach(p=>p.lastChild.style.display="none");};
+  if(!SCSPAN||!plots.length||!tip)return hide();
+  const r=plots[0].getBoundingClientRect(), f=(e.clientX-r.left)/r.width;
+  const over=plots.some(p=>{const b=p.getBoundingClientRect();return e.clientY>=b.top-8&&e.clientY<=b.bottom+18;});
+  if(!over||f<0||f>1)return hide();
+  const {x0,x1,span}=SCSPAN, ms=x0+f*(x1-x0);
+  const s=span.reduce((a,b)=>Math.abs(b.t-ms)<Math.abs(a.t-ms)?b:a);
+  plots.forEach(p=>{p.lastChild.style.display="block"; p.lastChild.style.left=((s.t-x0)/(x1-x0)*100)+"%";});
+  const [when,...lines]=hourFigures(new Date(s.t),s.h), hr=host.getBoundingClientRect();
+  tip.innerHTML="<b>"+when+"</b><br>"+lines.join("<br>"); tip.style.display="block";
+  const x=e.clientX-hr.left+14, y=e.clientY-hr.top+14;
+  tip.style.left=Math.min(x,hr.width-tip.offsetWidth-6)+"px"; tip.style.top=Math.min(y,hr.height-tip.offsetHeight-6)+"px";
 }
 
 // ---------- up right now (live, or the scrubbed time) ----------
@@ -866,7 +1029,10 @@ document.getElementById("scrub").oninput=e=>{ if(!NIGHTWIN)return;
 document.getElementById("scrubnow").onclick=()=>{ SIM=null; onSimChange(); };
 // The year chart sizes itself from its container, which has no width while the fold-out is closed.
 document.getElementById("yearfold").addEventListener("toggle",e=>{if(e.target.open)paintDarkness();});
-let dkTimer; window.addEventListener("resize",()=>{clearTimeout(dkTimer);dkTimer=setTimeout(()=>{paintNight();paintDarkness();},150);});
+let dkTimer; window.addEventListener("resize",()=>{clearTimeout(dkTimer);dkTimer=setTimeout(()=>{paintNight();paintDarkness();renderClouds();},150);});
+const sky=document.getElementById("skychart");
+["pointermove","pointerdown"].forEach(ev=>sky.addEventListener(ev,chartHover));
+sky.addEventListener("pointerleave",()=>chartHover({clientX:-1e6,clientY:-1e6}));
 selfCheck(); buildDarkGrid(); render(); updateNow(); setInterval(updateNow, 60000);
 </script>
 </body>

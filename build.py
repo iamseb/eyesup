@@ -17,12 +17,16 @@ config/horizon are git-ignored by default.
     python build.py
 """
 from __future__ import annotations
-import csv, json, math, os, sys, tomllib
+import csv, json, math, os, re, sys, tomllib, urllib.parse
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import numpy as np
 
 YEAR = 2026  # non-leap reference year; results are keyed by day-of-year
+DAYS = ("sun", "mon", "tue", "wed", "thu", "fri", "sat")  # JavaScript's getDay() order
+# Narrowband filters for "worth setting up": (name, wavelength nm, how much a full Moon
+# brightens that filter's sky, as a multiple of the dark sky) — SkyGuard's FILTERS.
+FILTERS = [["Hα/SII", 656.3, 0.3], ["OIII", 500.7, 2.0]]
 
 
 def jd_of(dt_utc):
@@ -70,6 +74,16 @@ def load_horizon():
     azw = np.concatenate([az - 360, az, az + 360]); alw = np.concatenate([al, al, al])
     return np.interp(np.arange(360.0), azw, alw)
 
+def load_icons():
+    """Meteocons (icons/, MIT) as data URIs, with each viewBox's size for equal-area drawing."""
+    out = {}
+    for f in sorted(os.listdir("icons")):
+        if f.endswith(".svg"):
+            svg = open(os.path.join("icons", f)).read()
+            w, h = map(float, re.search(r'viewBox="[^"]*?(\S+) (\S+)"', svg).groups())
+            out[f[:-4]] = {"uri": "data:image/svg+xml," + urllib.parse.quote(svg), "w": w, "h": h}
+    return out
+
 def load_targets():
     out = []
     for r in csv.DictReader(open("targets.csv")):
@@ -91,7 +105,7 @@ def main():
     cfg = load_config()
     lat = float(cfg["latitude"]); lon = float(cfg["longitude"])
     tz = ZoneInfo(cfg["timezone"]); site = cfg.get("site_name", "My Site")
-    dark_dep = float(cfg.get("dark_depression", 12.0))
+    dark_dep = float(cfg.get("dark_depression", 18.0))
     min_alt = float(cfg.get("min_altitude", 30.0))
     step = int(cfg.get("step_minutes", 15))
     selftest(lat, lon)
@@ -142,8 +156,10 @@ def main():
             "midMax": int(cfg.get("mid_cloud_max", 50)),
             "highConfMax": int(cfg.get("high_cloud_confident_max", 60)),
             "highNote": int(cfg.get("high_cloud_note", 40)),
-            "expStart": int(cfg.get("exposure_start_hour", 18)),
-            "expEnd": int(cfg.get("exposure_end_hour", 9)),
+            "expStart": int(cfg.get("exposure_start_hour", 22)),
+            # Per evening weekday, the morning hour the gear comes in (later after Fri/Sat).
+            "expEndByDay": [int(cfg.get("exposure_end_hour_by_evening", {"fri": 9, "sat": 9})
+                                .get(d, cfg.get("exposure_end_hour", 7))) for d in DAYS],
             "precipMm": float(cfg.get("precip_amount_max", 0.0)),
             "precipProb": int(cfg.get("precip_prob_max", 0)),
             "windWarn": int(cfg.get("wind_sustained_warn_kmh", 25)),
@@ -158,7 +174,15 @@ def main():
             "aodMax": float(cfg.get("aod_haze_max", 0.3)),
             "dewSpread": float(cfg.get("dew_spread_c", 2.0)),
             "jetSeeing": int(cfg.get("jet_seeing_kmh", 150)),
+            "worthIt": float(cfg.get("worth_it_hours", 2.0)),
+            "mistDepth": float(cfg.get("mist_depth_km", 0.5)),
+            "airmass": float(cfg.get("target_airmass", 1.5)),
+            "clearVis": int(cfg.get("clear_visibility_m", 50000)),
+            "mistStandin": int(cfg.get("mist_standin_vis_m", 10000)),
+            "aodClean": float(cfg.get("aod_clean", 0.1)),
+            "filters": FILTERS,
         },
+        "icons": load_icons(),
         "fov": {"w": float(cfg.get("fov_width_deg", 2.0)),
                 "h": float(cfg.get("fov_height_deg", 1.33))},
         "horizon": [round(float(h), 1) for h in horizon],
