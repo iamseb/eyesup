@@ -32,6 +32,13 @@ python build.py                          # writes dist/eyesup.html
 
 Open **`dist/eyesup.html`** in any browser (it works fully offline — bookmark it).
 
+The build also fetches each target's framing preview once (CDS's colour DSS2, or NASA
+SkyView's greyscale DSS when CDS is down) into `imgcache/`, and copies them to
+`dist/img/` beside the page, so the previews don't depend on either service being up
+when you look. The first build takes a few minutes for this; later ones reuse the
+cache (`--offline` skips downloading altogether). Any preview the build couldn't get
+is fetched live from those services instead.
+
 ## Measuring your horizon
 
 `horizon.csv` is just `azimuth,altitude` pairs in degrees (true azimuth, 0 = N,
@@ -81,6 +88,7 @@ The Moon is computed live in the browser: narrowband targets ignore it; RGB
 | `config.example.toml`, `horizon.example.csv` | ✓ | templates to copy |
 | `config.toml`, `horizon.csv` | ✗ (ignored) | **your** private inputs |
 | `dist/` | ✗ (ignored) | generated app |
+| `imgcache/` | ✗ (ignored) | downloaded framing previews, reused by later builds |
 
 ## Extending the catalogue
 

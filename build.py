@@ -17,7 +17,9 @@ config/horizon are git-ignored by default.
     python build.py
 """
 from __future__ import annotations
-import csv, json, math, os, re, sys, tomllib, urllib.parse
+import argparse, csv, hashlib, json, math, os, re, shutil, struct, sys, threading, tomllib
+import urllib.parse, urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import numpy as np
@@ -27,6 +29,11 @@ DAYS = ("sun", "mon", "tue", "wed", "thu", "fri", "sat")  # JavaScript's getDay(
 # Narrowband filters for "worth setting up": (name, wavelength nm, how much a full Moon
 # brightens that filter's sky, as a multiple of the dark sky) — SkyGuard's FILTERS.
 FILTERS = [["Hα/SII", 656.3, 0.3], ["OIII", 500.7, 2.0]]
+# Framing previews, hosted next to the page so they don't depend on a third-party
+# service being up: a list thumbnail and the detail-sheet image, in pixels wide.
+IMG_WIDTHS = {"t": 128, "f": 360}
+IMG_CACHE = "imgcache"
+UA = {"User-Agent": "EyesUp/1 (+https://github.com/iamseb/eyesup)"}
 
 
 def jd_of(dt_utc):
@@ -84,6 +91,100 @@ def load_icons():
             out[f[:-4]] = {"uri": "data:image/svg+xml," + urllib.parse.quote(svg), "w": w, "h": h}
     return out
 
+def jpeg_size(b):
+    """(width, height) of a JPEG, or None if it isn't one."""
+    if b[:2] != b"\xff\xd8":
+        return None
+    i = 2
+    while i + 9 < len(b):
+        if b[i] != 0xFF:
+            i += 1; continue
+        m = b[i + 1]
+        if m in (0xC0, 0xC1, 0xC2):
+            h, w = struct.unpack(">HH", b[i + 5:i + 9])
+            return w, h
+        if m == 0xD8 or m == 0x01 or 0xD0 <= m <= 0xD7 or m == 0xFF:
+            i += 2 if m != 0xFF else 1; continue
+        i += 2 + struct.unpack(">H", b[i + 2:i + 4])[0]
+    return None
+
+# Where a preview comes from, best first: CDS's colour DSS2, then NASA SkyView's
+# greyscale DSS (slower, and it asks callers to go gently; DSS rather than DSS2 as
+# some DSS2 red plates have blank patches). The template falls back through the same
+# two live. (name, parallel requests, url)
+IMG_SOURCES = [
+    ("cds", 4, lambda ra, dec, fw, fh, w, h: "https://alasky.u-strasbg.fr/hips-image-services/hips2fits?"
+        f"hips=CDS%2FP%2FDSS2%2Fcolor&ra={ra}&dec={dec}&fov={fw}&width={w}&height={h}&projection=TAN&format=jpg"),
+    ("skyview", 2, lambda ra, dec, fw, fh, w, h: "https://skyview.gsfc.nasa.gov/current/cgi/runquery.pl?"
+        f"Survey=DSS&Scaling=Sqrt&Position={ra},{dec}&Size={fw},{fh}&Pixels={w},{h}&Return=JPEG"),
+]
+
+def fetch_images(targets, fov, hosted, offline=False):
+    """Make sure every target has its previews, returning {id: {"t": file, "f": file}}.
+
+    A preview is named by a hash of the request that made it, so it never needs
+    fetching twice: files already on the CDN (hosted) or in imgcache/ are reused, and
+    only missing ones are downloaded. A SkyView stand-in is swapped for the CDS colour
+    image on a later build once CDS answers. Previews no source could supply are left
+    out, and the page fetches those live.
+    """
+    os.makedirs(IMG_CACHE, exist_ok=True)
+    have = set(hosted) | set(os.listdir(IMG_CACHE))
+    gate = {src: threading.Semaphore(n) for src, n, _ in IMG_SOURCES}
+    fails = {src: 0 for src, _, _ in IMG_SOURCES}
+    lock = threading.Lock()
+
+    def download(src, url, w, h):
+        if fails[src] >= 3:  # the service looks down: stop waiting on it this build
+            return None
+        with gate[src]:
+            for attempt in range(3):
+                try:
+                    b = urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=30).read()
+                except Exception:
+                    b = b""
+                if jpeg_size(b) == (w, h):
+                    with lock:
+                        fails[src] = 0
+                    return b
+                if b"Too Many" not in b:  # SkyView's "busy, try again shortly"
+                    break
+                threading.Event().wait(5 * (attempt + 1))
+        with lock:
+            fails[src] += 1
+        return None
+
+    def preview(job):
+        tid, _, args = job
+        for src, _, url in IMG_SOURCES:
+            u = url(*args)
+            name = re.sub(r"\W", "", tid) + "-" + hashlib.sha1(u.encode()).hexdigest()[:10] + f"-{src}.jpg"
+            if name in have:
+                return name
+            if not offline:
+                b = download(src, u, args[4], args[5])
+                if b:
+                    open(os.path.join(IMG_CACHE, name), "wb").write(b)
+                    return name
+        return None
+
+    jobs = [(t[0], k, (t[2], t[3], fov["w"], fov["h"], w, round(w * fov["h"] / fov["w"])))
+            for t in targets for k, w in IMG_WIDTHS.items()]  # (target id, size, url arguments)
+    with ThreadPoolExecutor(4) as ex:
+        names = list(ex.map(preview, jobs))
+    out = {}
+    for j, name in zip(jobs, names):
+        if name:
+            out.setdefault(j[0], {})[j[1]] = name
+    os.makedirs("dist/img", exist_ok=True)
+    for name in filter(None, names):
+        if name not in hosted:
+            shutil.copyfile(os.path.join(IMG_CACHE, name), os.path.join("dist/img", name))
+    by_src = {src: sum(1 for n in names if n and n.endswith(f"-{src}.jpg")) for src, _, _ in IMG_SOURCES}
+    print("  previews: " + ", ".join(f"{n} {src}" for src, n in by_src.items())
+          + f", {names.count(None)} missing (fetched live)")
+    return out
+
 def load_targets():
     out = []
     for r in csv.DictReader(open("targets.csv")):
@@ -102,12 +203,17 @@ def selftest(lat, lon):
 
 
 def main():
+    ap = argparse.ArgumentParser(description="Build dist/eyesup.html.")
+    ap.add_argument("--hosted", help="file listing preview images already on the CDN, one per line")
+    ap.add_argument("--offline", action="store_true", help="don't download previews; use imgcache/ only")
+    opts = ap.parse_args()
     cfg = load_config()
     lat = float(cfg["latitude"]); lon = float(cfg["longitude"])
     tz = ZoneInfo(cfg["timezone"]); site = cfg.get("site_name", "My Site")
     dark_dep = float(cfg.get("dark_depression", 18.0))
     min_alt = float(cfg.get("min_altitude", 30.0))
     step = int(cfg.get("step_minutes", 15))
+    fov = {"w": float(cfg.get("fov_width_deg", 2.0)), "h": float(cfg.get("fov_height_deg", 1.33))}
     selftest(lat, lon)
 
     horizon = load_horizon()
@@ -190,8 +296,7 @@ def main():
             "filters": FILTERS,
         },
         "icons": load_icons(),
-        "fov": {"w": float(cfg.get("fov_width_deg", 2.0)),
-                "h": float(cfg.get("fov_height_deg", 1.33))},
+        "fov": fov,
         "horizon": [round(float(h), 1) for h in horizon],
         "darkHours": [int(round(h * 10)) for h in darkhours],
         "check": checks,
@@ -206,13 +311,17 @@ def main():
     data["targets"].sort(key=lambda t: -max(t["hours"]))
 
     os.makedirs("dist", exist_ok=True)
+    shutil.rmtree("dist/img", ignore_errors=True)
+    hosted = set(open(opts.hosted).read().split()) if opts.hosted else set()
+    data["img"] = fetch_images(targets, fov, hosted, opts.offline)
     json.dump(data, open("dist/data.json", "w"), separators=(",", ":"))
     html = open("template.html").read().replace(
         "__EYESUP_DATA__", json.dumps(data, separators=(",", ":")))
     open("dist/eyesup.html", "w").write(html)
     nb = sum(t["type"] == "NB" for t in data["targets"])
     print(f"Built dist/eyesup.html for {site} ({lat:.2f}, {lon:.2f}) — "
-          f"{len(targets)} targets ({nb} NB / {len(targets)-nb} RGB).")
+          f"{len(targets)} targets ({nb} NB / {len(targets)-nb} RGB), "
+          f"previews for {len(data['img'])} ({len(os.listdir('dist/img'))} files in dist/img).")
 
 
 if __name__ == "__main__":

@@ -6,7 +6,9 @@ name: Build & deploy to bunny.net
 # push-to-main plus a manual trigger, with no timer.
 #
 # Your location never touches this public repo: config.toml and horizon.csv are
-# restored from secrets at build time, and only the built HTML is uploaded.
+# restored from secrets at build time, and only the built HTML is uploaded, with the
+# framing previews under img/. Previews already in storage are listed first so the
+# build only fetches (and this only uploads) the ones that are new.
 #
 # Required repo settings (Settings → Secrets and variables → Actions):
 #   Secrets:
@@ -56,8 +58,41 @@ jobs:
           printf '%s' "$EYESUP_CONFIG" > config.toml
           printf '%s' "$EYESUP_HORIZON" > horizon.csv
 
+      - name: List previews already in bunny.net storage
+        env:
+          KEY: ${{ secrets.BUNNY_STORAGE_KEY }}
+          ZONE: ${{ vars.BUNNY_STORAGE_ZONE }}
+          ENDPOINT: ${{ vars.BUNNY_STORAGE_ENDPOINT }}
+        run: |
+          code=$(curl -s -o listing.json -w '%{http_code}' \
+            "https://${ENDPOINT}/${ZONE}/img/" -H "AccessKey: ${KEY}")
+          echo "listing HTTP $code"
+          if [ "$code" = "200" ]; then
+            python -c "import json; print('\n'.join(o['ObjectName'] for o in json.load(open('listing.json')) if not o['IsDirectory']))" > hosted.txt
+          else
+            : > hosted.txt
+          fi
+          echo "$(wc -l < hosted.txt) previews already hosted"
+
       - name: Build
-        run: python build.py
+        run: python build.py --hosted hosted.txt
+
+      - name: Upload new previews to bunny.net storage
+        env:
+          KEY: ${{ secrets.BUNNY_STORAGE_KEY }}
+          ZONE: ${{ vars.BUNNY_STORAGE_ZONE }}
+          ENDPOINT: ${{ vars.BUNNY_STORAGE_ENDPOINT }}
+        run: |
+          shopt -s nullglob
+          for f in dist/img/*.jpg; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' \
+              -X PUT "https://${ENDPOINT}/${ZONE}/img/$(basename "$f")" \
+              -H "AccessKey: ${KEY}" \
+              -H "Content-Type: image/jpeg" \
+              --data-binary @"$f")
+            test "$code" = "201" || test "$code" = "200" || { echo "upload $f HTTP $code"; exit 1; }
+          done
+          echo "uploaded $(ls dist/img | wc -l) previews"
 
       - name: Upload to bunny.net storage as index.html
         env:

@@ -4,6 +4,8 @@ horizon.csv
 
 # Generated output
 dist/
+imgcache/
+hosted.txt
 
 __pycache__/
 *.pyc
