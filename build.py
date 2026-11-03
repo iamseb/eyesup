@@ -174,6 +174,13 @@ def main():
             "aodMax": float(cfg.get("aod_haze_max", 0.3)),
             "dewSpread": float(cfg.get("dew_spread_c", 2.0)),
             "jetSeeing": int(cfg.get("jet_seeing_kmh", 150)),
+            # Setup window: an hour clear and dark enough to polar align before bed (bed 24 = 00:00).
+            "requireSetup": bool(cfg.get("require_setup_window", True)),
+            "setupStart": int(cfg.get("setup_window_start_hour", 21)),
+            "setupEndByDay": [int(cfg.get("setup_window_end_hour_by_evening", {"fri": 24, "sat": 24})
+                                  .get(d, cfg.get("setup_window_end_hour", 22))) for d in DAYS],
+            "setupMinClear": int(cfg.get("setup_min_clear_hours", 1)),
+            "alignDep": float(cfg.get("align_depression", 10.0)),
             "worthIt": float(cfg.get("worth_it_hours", 2.0)),
             "mistDepth": float(cfg.get("mist_depth_km", 0.5)),
             "airmass": float(cfg.get("target_airmass", 1.5)),

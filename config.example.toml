@@ -51,6 +51,16 @@ mist_spread_c     = 1.5         # °C — air this close to its dew point counts
 aod_haze_max      = 0.3         # aerosol optical depth (CAMS) — dust or smoke above this is hazy, like mist
 dew_spread_c      = 2.0         # °C — reported: dew (or frost) likely, fit the heaters
 jet_seeing_kmh    = 150         # km/h at 250 hPa — reported: fast jet stream, poor seeing
+# Setup window: you set up and polar align before bed, so a night needs at least
+# setup_min_clear_hours that are clear and dark enough to align (Sun below align_depression°)
+# between the start hour and bedtime. Hours ≥ 24 mean past midnight (24 = 00:00).
+# Once a permanent pier holds the mount aligned, set require_setup_window = false.
+require_setup_window    = true
+setup_window_start_hour = 21
+setup_window_end_hour   = 22    # bedtime…
+setup_window_end_hour_by_evening = { fri = 24, sat = 24 }   # …later on Fri/Sat nights
+setup_min_clear_hours   = 1
+align_depression        = 10.0
 # Worth setting up? Each usable hour is weighted by how much data it gives through each
 # filter (Hα/SII, OIII) next to a clean, moonless hour — mist, haze and moonlight cost
 # time — to give the night's "equivalent clear hours". Below this in every filter, a

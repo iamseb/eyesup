@@ -66,6 +66,7 @@
   .sc-h{display:flex;flex-direction:column;align-items:center;font-size:13px;font-weight:500;cursor:default}
   .sc-h .ic{display:flex;align-items:center}
   .sc-h i{display:block;height:2.5px;width:76%;border-radius:2px}
+  .sc-h small{font-size:10px;font-weight:400;color:rgba(255,255,255,.72);height:14px;margin-top:3px}
   .sc-plot{position:relative;margin:8px 44px 20px 0}
   .sc-plot svg{display:block;width:100%;height:100%;overflow:visible}
   .sc-y{position:absolute;right:-44px;font-size:10px;color:rgba(255,255,255,.5);transform:translateY(-50%)}
@@ -473,18 +474,23 @@ function moonSpans(start,end){
   if(up!==null)spans.push([up,end.getTime()]);
   return spans;
 }
-// Verdict for the night starting on the evening of `base` (SkyGuard's score_night, minus its setup window).
+// Verdict for the night starting on the evening of `base` (SkyGuard's score_night).
 function judgeNight(base){
   if(!WXH)return null;
   const d0=new Date(base); d0.setHours(12,0,0,0);
   const es=new Date(d0); es.setHours(WXC.expStart);
   const ee=new Date(d0); ee.setDate(ee.getDate()+1); ee.setHours(WXC.expEndByDay[d0.getDay()]);
-  const dark=[],times=[],exp=[],expT=[],seen=new Set(); let expMissing=0;
+  // Setup window: you set up and polar align before bed, so it needs an hour that's clear and dark enough
+  // to align (bedtime may run past midnight: 24 = 00:00).
+  const ss=new Date(d0); ss.setHours(WXC.setupStart);
+  const bed=WXC.setupEndByDay[d0.getDay()], se=new Date(d0); se.setDate(se.getDate()+Math.floor(bed/24)); se.setHours(bed%24);
+  const dark=[],times=[],exp=[],expT=[],setup=[],seen=new Set(); let expMissing=0;
   for(let ms=d0.getTime();ms<d0.getTime()+864e5;ms+=36e5){
     const t=new Date(ms), k=hourKey(t), h=WXH[k];
     if(seen.has(k))continue; seen.add(k);   // clocks going back repeat a local hour; Open-Meteo lists it once
     if(t>=es&&t<ee){ if(h){exp.push(h);expT.push(t);} else expMissing++; }
     if(h&&sunAlt(t)<=-DATA.darkDep){dark.push(h);times.push(t);}
+    if(h&&t>=ss&&t<se&&sunAlt(t)<=-WXC.alignDep)setup.push([t,h]);
   }
   if(!dark.some(hasCloud))return {none:true};
   const conf=dark.map(h=>okBoth(h)), any=dark.map(okAny), strict=dark.map(h=>okBoth(h,true));
@@ -501,7 +507,11 @@ function judgeNight(base){
   const moonlight=t=>bright*spans.reduce((s,[a,b])=>s+Math.max(0,Math.min(b,t.getTime()+36e5)-Math.max(a,t.getTime())),0)/36e5;
   const equivalent=WXC.filters.map(f=>dark.reduce((s,h,i)=>okAny(h)?s+(okBoth(h)?1:0.5)*quality(h,f,moonlight(times[i])):s,0));
   const worthFilters=WXC.filters.filter((f,i)=>equivalent[i]>=WXC.worthIt).map(f=>f[0]);
-  const qualifies=!rain&&!windy&&skyOk&&worthFilters.length>0, confident=qualifies&&runStrict>=WXC.confMinRun;
+  const req=WXC.requireSetup, setupClear=setup.filter(([,h])=>okAny(h));
+  const setupOk=setup.filter(([,h])=>okBoth(h)).length>=WXC.setupMinClear||setupClear.length>=WXC.setupMinClear;
+  const setupStrictOk=setup.filter(([,h])=>modelOk(h,h.p,true)===true||modelOk(h,h.s,true)===true).length>=WXC.setupMinClear;
+  const qualifies=!rain&&!windy&&(setupOk||!req)&&skyOk&&worthFilters.length>0;
+  const confident=qualifies&&runStrict>=WXC.confMinRun&&(setupStrictOk||!req);
   const tentative=!(nConf>=WXC.minHours&&run>=WXC.minRun);
   const bothCover=dark.every(h=>h.p.low!=null&&h.s.low!=null);
   const highs=dark.map(h=>h.p.high??h.s.high).filter(v=>v!=null);
@@ -519,12 +529,14 @@ function judgeNight(base){
   const why=dimmed||(nConf<nAny?"models disagree":spans.length&&illum>=50?"bright Moon":"too short");
   return {
     light: confident?"go":qualifies?"maybe":"no", qualifies,
-    cause: qualifies?null:rain?"rain":windy?"wind":skyOk?"notworth":foggy?"fog":"cloud",
+    cause: qualifies?null:rain?"rain":windy?"wind":req&&!setupOk?"setup":skyOk?"notworth":foggy?"fog":"cloud",
+    setupWhy: setup.length===0?"dark":foggy?"fog":"cloud",   // why setup fails: too light to align, or no clear hour
+    setupOk, setupFrom: setupClear.length?setupClear[0][0]:null, setupStart: ss, setupEnd: se, setupWin: hhmm(ss)+"–"+hhmm(se),
     notWorth: "not worth setting up ("+why+", ≈"+Math.max(...equivalent).toFixed(1)+" h)",
     equivalent: WXC.filters.map((f,i)=>[f[0],equivalent[i]]), worthFilters, moonIllum: illum, moonUp: spans.length>0,
     darkTimes: times, darkStart: times[0], darkEnd, expStart: es, expEnd: ee,
     reason: !bothCover?modelName(WXC.models[dark.every(h=>h.s.low!=null)?1:0])+" only"
-      : run<WXC.confMinRun?"models disagree":dimmed||"heavy high cloud",
+      : run<WXC.confMinRun?"models disagree":(dimmed||"heavy high cloud")+(runStrict<WXC.confMinRun?"":" at setup time"),
     mistFrom: mistAt>=0?times[mistAt]:null, fogFrom: fogAt>=0?times[fogAt]:null,
     minVis: minOf(dark.flatMap(h=>h.vis)), minSpread: minOf(dark.map(spreadOf)),
     minTemp: minOf(dark.flatMap(h=>h.temp)), aodMax: maxOf(dark.map(h=>h.aod)),
@@ -545,9 +557,15 @@ function verdictText(v,short){
   if(v.none)return ["no forecast","var(--muted)"];
   const runTxt=v.runAt?hhmm(v.runAt)+"–"+hhmm(new Date(v.runAt.getTime()+v.run*36e5)):"";
   const notes=(v.breezy?" · breezy (gusts "+v.gust+" km/h)":"")+(v.highNote?" · thin high cloud":"")+
-    airNotes(v).map(x=>" · "+x).join("")+" · "+worthTxt(v);
+    airNotes(v).map(x=>" · "+x).join("")+" · "+worthTxt(v)+
+    (WXC.requireSetup&&v.setupFrom?" · set up from "+hhmm(v.setupFrom)+" (bed "+hhmm(v.setupEnd)+")":"");
   if(v.light==="go")return [short?"🟢 "+v.hours+" h clear"+filterHint(v):"🟢 Go — "+v.hours+" h usable, best run "+runTxt+filterHint(v)+notes,"var(--nb)"];
   if(v.light==="maybe")return [short?"🟡 "+v.hours+" h · "+v.reason+filterHint(v):"🟡 Maybe — "+v.hours+" h usable ("+runTxt+"), "+v.reason+filterHint(v)+notes,"var(--warn)"];
+  if(v.cause==="setup"){
+    if(v.setupWhy==="dark")return [short?"🌆 too light to align":"🌆 No-go — not dark enough to align before bed ("+v.setupWin+")","var(--muted)"];
+    const ic=v.setupWhy==="fog"?"🌫":"☁";
+    return [short?ic+" "+(v.setupWhy==="fog"?"foggy":"cloudy")+" before bed":ic+" No-go — no clear hour to set up & align before bed ("+v.setupWin+")","var(--muted)"];
+  }
   if(v.cause==="notworth")return [short?"🔭 not worth it":"🔭 No-go — "+v.notWorth+airNotes(v).map(x=>" · "+x).join(""),"var(--muted)"];
   if(v.cause==="rain"){
     if(short)return ["🌧 rain — no-go","#6ea8ff"];
@@ -777,12 +795,14 @@ function chartHeadline(v){
     const word=reason.startsWith("mist")?"Misty":reason.startsWith("dust")||reason.startsWith("heavy high cloud")?"Hazy":"Clear";
     head=v.runAt<=v.darkStart&&end>=v.darkEnd?word+" all night":end>=v.darkEnd?word+" from "+hhmm(v.runAt)
       :word+" "+hhmm(v.runAt)+"–"+hhmm(end);
-  }else{const s={rain:"rain forecast",wind:"too windy",notworth:v.notWorth,fog:"foggy",cloud:"too cloudy"}[v.cause];
+  }else{const s={rain:"rain forecast",wind:"too windy",notworth:v.notWorth,fog:"foggy",cloud:"too cloudy",
+      setup:{dark:"not dark enough to align before bed",fog:"foggy before bed",cloud:"cloudy before bed"}[v.setupWhy]}[v.cause];
     head=s.charAt(0).toUpperCase()+s.slice(1).toLowerCase();}
   const parts=[v.light==="go"?"Confident go":v.light==="maybe"?"Maybe: "+v.reason:"Not tonight"];
   if(v.nAny)parts.push(v.equivalent.map(([f,x])=>f+" ≈"+x.toFixed(1)+" h").join(", "));
   if(v.rain)parts.push("rain up to "+v.rainMm.toFixed(1)+" mm"+(v.rainProb!=null?", "+v.rainProb+"% chance":""));
   else if(v.windy)parts.push("gusts "+v.gust+" km/h");
+  if(WXC.requireSetup){if(v.qualifies&&v.setupFrom)parts.push("set up from "+hhmm(v.setupFrom)); parts.push("bed "+hhmm(v.setupEnd));}
   parts.push("moon "+v.moonIllum+"%");
   return [head,parts.join(" · ")];
 }
@@ -822,7 +842,8 @@ function renderClouds(){
     '<div class="sc-hours" style="grid-template-columns:repeat('+darkH.length+',1fr)">'+darkH.map((h,i)=>
       '<div class="sc-h" title="'+hourFigures(v.darkTimes[i],h).join(" · ")+'">'+pad2(v.darkTimes[i].getHours())+
       '<span class="ic" style="height:'+Math.round(size*1.3)+'px">'+iconImg(SC.icon[icons[i]],size)+'</span>'+
-      '<i style="background:'+SC.mark[markOf(h)]+'"></i></div>').join("")+'</div></div>';
+      '<i style="background:'+SC.mark[markOf(h)]+'"></i>'+(WXC.requireSetup?'<small>'+
+        (+v.darkTimes[i]===+v.setupStart?"set up":+v.darkTimes[i]===+v.setupEnd?"bed":"")+'</small>':'')+'</div>').join("")+'</div></div>';
 
   // One card per cloud layer, then visibility: both models as smooth curves against the limit.
   const cards=[["low","LOW CLOUD · LIMIT "+WXC.lowMax+"%",WXC.lowMax,96,["0%","100%"]],
@@ -836,6 +857,8 @@ function renderClouds(){
     let svg='<svg viewBox="0 0 1000 100" preserveAspectRatio="none">';
     const shade=(a,b)=>b>a?'<rect x="'+a.toFixed(1)+'" y="0" width="'+(b-a).toFixed(1)+'" height="100" fill="rgba(0,0,0,.22)"/>':'';
     svg+=shade(0,X(v.darkStart.getTime()))+shade(X(v.darkEnd.getTime()),1000);   // twilight either side of the dark
+    if(WXC.requireSetup){const a=Math.max(0,X(v.setupStart.getTime())),b=Math.min(1000,X(v.setupEnd.getTime()));   // set up → bed
+      if(b>a)svg+='<rect x="'+a.toFixed(1)+'" y="0" width="'+(b-a).toFixed(1)+'" height="100" fill="rgba(255,255,255,.05)"/>';}
     [0,50,100].forEach(g=>{svg+='<line x1="0" x2="1000" y1="'+Y(g).toFixed(2)+'" y2="'+Y(g).toFixed(2)+'" stroke="rgba(255,255,255,.12)" stroke-width=".5"'+ns+'/>';});
     svg+='<line x1="0" x2="1000" y1="'+Y(limit).toFixed(2)+'" y2="'+Y(limit).toFixed(2)+'" stroke="rgba(255,255,255,.72)" stroke-width="1.2" stroke-dasharray="0.1 3.6" stroke-linecap="round"'+ns+'/>';
     [0,1].forEach(m=>{
@@ -858,7 +881,8 @@ function renderClouds(){
       span.filter(s=>new Date(s.t).getHours()%3===0).map(s=>'<span class="sc-x" style="left:'+(X(s.t)/10).toFixed(2)+'%">'+hhmm(new Date(s.t))+'</span>').join("")+
       '<div class="sc-cross"></div></div></div>';
   });
-  host.innerHTML=html+'<div class="sc-foot">Shaded: twilight · icons: Meteocons by Bas Milius</div><div id="sctip"></div>';
+  host.innerHTML=html+'<div class="sc-foot">Shaded: twilight'+(WXC.requireSetup?' · lighter band: set up to bed':'')+
+    ' · icons: Meteocons by Bas Milius</div><div id="sctip"></div>';
 }
 // Hover read-out: a crosshair through every card at the nearest hour, and that hour's figures.
 function chartHover(e){
